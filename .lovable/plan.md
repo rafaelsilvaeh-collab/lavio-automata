@@ -1,83 +1,55 @@
 
-# Lavio — SaaS de Gestão para Lava-Rápidos
 
-## Visão Geral
-Construir o Lavio completo: landing page, autenticação, dashboard do lava-rápido, CRM de clientes, gestão de pátio, fluxo de caixa, automação de WhatsApp e painel admin. Mobile-first, interface limpa e moderna.
+# Plano: Ajustes de UI + Banco de Dados + Preparação Stripe/Z-API
 
-## Design System
-- **Cores**: Azul vibrante (#2563EB) como primária, gradientes suaves, fundo claro
-- **Tipografia**: Inter (clean, moderna)
-- **Estilo**: Cards arredondados, sombras sutis, ícones Lucide, interface mobile-first
+## 1. Ajustes visuais na Landing Page
 
-## Fase 1: Landing Page
-- Hero com headline estilo Challenger Sale (problema → quebra de crença → solução)
-- Seção de vídeo demonstrativo (placeholder com player)
-- 3 blocos de dados/estatísticas de mercado com ícones
-- Tabela de preços: plano único R$110/mês com descontos semestral (12%) e anual (22%)
-- CTA "Comece a usar agora — 7 dias grátis"
-- Footer com suporte@lavio.app
-- Totalmente responsiva
+**Botão "Ver como funciona"**: Trocar de outline branco (ilegível no fundo escuro) para estilo com fundo azul gradient, texto branco — mesmo visual do botão principal mas com variação (ex: borda + fundo semi-transparente azul).
 
-## Fase 2: Autenticação
-- Login, cadastro e recuperação de senha via Lovable Cloud (Supabase Auth)
-- Redirecionamento pós-login para dashboard
-- Proteção de rotas autenticadas
+**Planos no mobile**: Mudar o layout dos botões de ciclo de billing de `flex` horizontal para `flex-col` no mobile, listando Mensal → Semestral → Anual verticalmente. No desktop mantém horizontal.
 
-## Fase 3: Dashboard do Lava-Rápido
-- Visão geral: carros no pátio, em lavagem, finalizados
-- Faturamento do dia e clientes atendidos
-- Cards com números grandes, fácil leitura no celular
-- Navegação por sidebar (desktop) e bottom nav (mobile)
+**Badge "Mais vendido"**: Adicionar badge destacado no botão/opção Semestral com texto "Mais vendido" em cor de destaque.
 
-## Fase 4: CRM de Clientes
-- Cadastro: nome, telefone, modelo do carro, placa, observações
-- Listagem com busca e filtros
-- Histórico de serviços por cliente
-- Status ativo/inativo, cliente recorrente
-- Data da última lavagem
+## 2. Criar tabelas no banco de dados
 
-## Fase 5: Gestão do Pátio (Registro de Carros)
-- Registrar carro: selecionar cliente, serviço, horário entrada
-- Tempo estimado do serviço
-- Status: aguardando → em lavagem → finalizado → cliente avisado → entregue
-- Timeline visual do progresso
-- Botão "Alterar horário do aviso" para ajuste manual
-- Registro rápido (< 30 segundos)
+Migração SQL com as seguintes tabelas:
 
-## Fase 6: Fluxo de Caixa
-- Tela "Caixa do Dia"
-- Entradas: lavagem simples, completa, outros serviços
-- Saídas: produtos, funcionários, outros custos
-- Totais: entradas, saídas, resultado do dia
-- Seletor de data para ver dias anteriores
+- **profiles** — id (ref auth.users), business_name, phone, created_at
+- **customers** — id, user_id, name, phone, car_model, plate, notes, is_recurring, is_active, last_wash_date, created_at
+- **services** — id, user_id, name, price, duration_minutes, created_at
+- **cars_in_yard** — id, user_id, customer_id (ref customers), service_id (ref services), entry_time, estimated_duration, scheduled_notification_time, status (enum: aguardando/em_lavagem/finalizado/cliente_avisado/entregue), notes, created_at
+- **cash_flow_entries** — id, user_id, type (entrada/saida), category, description, amount, entry_date, created_at
+- **whatsapp_config** — id, user_id, is_connected, phone_number, api_key, instance_id, created_at
+- **message_templates** — id, user_id, template_type (carro_pronto/cliente_inativo), message_text, is_active, created_at
+- **user_roles** — id, user_id (ref auth.users), role (enum: admin/user)
 
-## Fase 7: WhatsApp (Interface + Preparação para Z-API)
-- Página "Conectar WhatsApp" com área para QR Code
-- Status conectado/desconectado com botões reconectar/desconectar
-- Mensagens automáticas configuráveis:
-  - "Carro pronto" — enviada ao finalizar serviço
-  - "Cliente inativo" — após 21 dias sem visita
-- Templates de mensagem editáveis
-- Interface completa preparada para integração com Z-API (será configurada quando a chave API estiver disponível)
+Todas com RLS habilitado. Políticas: usuários autenticados acessam apenas seus próprios dados (`user_id = auth.uid()`). Função `has_role` para admin.
 
-## Fase 8: Stripe (Pagamentos)
-- Habilitar integração Stripe para cobrança do plano SaaS
-- Checkout para plano mensal/semestral/anual
-- Gerenciamento de assinatura
+Trigger para criar profile automaticamente no signup.
 
-## Fase 9: Painel Admin do SaaS
-- Gestão de usuários: listar, ativar/desativar contas
-- Métricas: MRR, número de clientes, churn, trials ativos, receita total
-- Gestão de planos: editar preço e descontos
-- Controle da landing page: editar headline, textos, vídeo, preços
-- Protegido por role "admin" (tabela user_roles)
+## 3. Habilitar Stripe
 
-## Banco de Dados (Supabase/Lovable Cloud)
-- Tabelas: profiles, customers, cars_in_yard, services, cash_flow_entries, whatsapp_config, message_templates, landing_page_content, user_roles
-- RLS em todas as tabelas
-- Dados isolados por tenant (multi-tenant via user_id)
+Usar a ferramenta `enable_stripe` para ativar a integração. Após ativação, criar os produtos e preços:
+- Plano Mensal: R$110/mês
+- Plano Semestral: R$96,80/mês (billing a cada 6 meses)
+- Plano Anual: R$85,80/mês (billing anual)
 
-## Responsividade
-- Mobile-first em todas as telas
-- Bottom navigation no mobile, sidebar no desktop
-- Tabelas responsivas com cards no mobile
+Integrar checkout na landing page e gerenciamento de assinatura no dashboard.
+
+## 4. Preparação Z-API
+
+Criar a estrutura para integração Z-API:
+- Tabela `whatsapp_config` (já incluída acima) para armazenar credenciais
+- Edge function para proxy de chamadas Z-API (gerar QR code, enviar mensagem, verificar status)
+- Secret `ZAPI_TOKEN` será solicitada ao usuário quando for configurar
+- Interface já existe — será conectada às edge functions
+
+## Arquivos modificados
+
+| Arquivo | Mudança |
+|---|---|
+| `src/pages/Landing.tsx` | Cor do botão, layout mobile dos planos, badge "Mais vendido" |
+| Migration SQL | Criar todas as tabelas, enums, RLS, triggers |
+| Stripe integration | Habilitar e configurar produtos |
+| Edge function (whatsapp) | Proxy para Z-API |
+
