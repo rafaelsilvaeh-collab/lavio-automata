@@ -154,22 +154,28 @@ const Landing = () => {
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Plano simples, sem surpresas</h2>
           <p className="text-muted-foreground mb-8">Comece com 7 dias grátis. Cancele quando quiser.</p>
           
-          <div className="flex justify-center gap-2 mb-10">
+          <div className="flex flex-col sm:flex-row justify-center gap-2 mb-10">
             {(['monthly', 'semiannual', 'annual'] as const).map((cycle) => (
-              <Button
-                key={cycle}
-                variant={billingCycle === cycle ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setBillingCycle(cycle)}
-                className={billingCycle === cycle ? 'gradient-primary border-0' : ''}
-              >
-                {prices[cycle].label}
-                {prices[cycle].discount && (
-                  <Badge className="ml-2 bg-success/10 text-success border-success/20 text-xs">
-                    {prices[cycle].discount}
+              <div key={cycle} className="relative">
+                {cycle === 'semiannual' && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 bg-orange-500 text-white border-0 text-xs whitespace-nowrap">
+                    Mais vendido
                   </Badge>
                 )}
-              </Button>
+                <Button
+                  variant={billingCycle === cycle ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBillingCycle(cycle)}
+                  className={`w-full sm:w-auto ${billingCycle === cycle ? 'gradient-primary border-0' : ''}`}
+                >
+                  {prices[cycle].label}
+                  {prices[cycle].discount && (
+                    <Badge className="ml-2 bg-success/10 text-success border-success/20 text-xs">
+                      {prices[cycle].discount}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
             ))}
           </div>
 
