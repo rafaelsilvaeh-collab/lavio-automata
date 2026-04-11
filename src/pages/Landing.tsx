@@ -54,7 +54,7 @@ const Landing = () => {
             <Button size="lg" onClick={() => navigate('/auth?tab=signup')} className="gradient-primary border-0 text-lg px-8 py-6 rounded-xl shadow-lg">
               Comece a usar agora
             </Button>
-            <Button size="lg" variant="outline" className="text-lg px-8 py-6 rounded-xl border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10" onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })}>
+            <Button size="lg" className="text-lg px-8 py-6 rounded-xl bg-primary/30 hover:bg-primary/50 text-primary-foreground border border-primary/40" onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })}>
               <Play className="mr-2 h-5 w-5" /> Ver como funciona
             </Button>
           </div>
