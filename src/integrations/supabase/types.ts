@@ -14,16 +14,299 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cars_in_yard: {
+        Row: {
+          created_at: string
+          customer_id: string
+          entry_time: string
+          estimated_duration: number | null
+          id: string
+          notes: string | null
+          scheduled_notification_time: string | null
+          service_id: string | null
+          status: Database["public"]["Enums"]["car_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          entry_time?: string
+          estimated_duration?: number | null
+          id?: string
+          notes?: string | null
+          scheduled_notification_time?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["car_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          entry_time?: string
+          estimated_duration?: number | null
+          id?: string
+          notes?: string | null
+          scheduled_notification_time?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["car_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cars_in_yard_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cars_in_yard_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_flow_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          entry_date: string
+          id: string
+          type: Database["public"]["Enums"]["cash_flow_type"]
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          id?: string
+          type: Database["public"]["Enums"]["cash_flow_type"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          id?: string
+          type?: Database["public"]["Enums"]["cash_flow_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          car_model: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          is_recurring: boolean
+          last_wash_date: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          plate: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          car_model?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_recurring?: boolean
+          last_wash_date?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          plate?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          car_model?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_recurring?: boolean
+          last_wash_date?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          plate?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          message_text: string
+          template_type: Database["public"]["Enums"]["template_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          message_text: string
+          template_type: Database["public"]["Enums"]["template_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          message_text?: string
+          template_type?: Database["public"]["Enums"]["template_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          id: string
+          name: string
+          price: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          name: string
+          price?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          name?: string
+          price?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_config: {
+        Row: {
+          api_key: string | null
+          created_at: string
+          id: string
+          instance_id: string | null
+          is_connected: boolean
+          phone_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string | null
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          is_connected?: boolean
+          phone_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string | null
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          is_connected?: boolean
+          phone_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      car_status:
+        | "aguardando"
+        | "em_lavagem"
+        | "finalizado"
+        | "cliente_avisado"
+        | "entregue"
+      cash_flow_type: "entrada" | "saida"
+      template_type: "carro_pronto" | "cliente_inativo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +433,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      car_status: [
+        "aguardando",
+        "em_lavagem",
+        "finalizado",
+        "cliente_avisado",
+        "entregue",
+      ],
+      cash_flow_type: ["entrada", "saida"],
+      template_type: ["carro_pronto", "cliente_inativo"],
+    },
   },
 } as const
