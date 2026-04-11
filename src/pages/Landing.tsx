@@ -10,9 +10,9 @@ const Landing = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'semiannual' | 'annual'>('monthly');
 
   const prices = {
-    monthly: { price: 110, label: 'Mensal', discount: null },
-    semiannual: { price: 96.80, label: 'Semestral', discount: '12% OFF' },
-    annual: { price: 85.80, label: 'Anual', discount: '22% OFF' },
+    monthly: { price: 110, label: 'Mensal', discount: null, stripeLink: 'https://buy.stripe.com/cNi7sLfz20Q5fw22P12Ry09' },
+    semiannual: { price: 96.80, label: 'Semestral', discount: '12% OFF', stripeLink: 'https://buy.stripe.com/6oU6oHbiM7et0B8gFR2Ry0a' },
+    annual: { price: 85.80, label: 'Anual', discount: '22% OFF', stripeLink: 'https://buy.stripe.com/dRm3cv3QkfKZ3Nk0GT2Ry0b' },
   };
 
   const currentPrice = prices[billingCycle];
@@ -204,7 +204,7 @@ const Landing = () => {
                   </li>
                 ))}
               </ul>
-              <Button className="w-full gradient-primary border-0 text-lg py-6 rounded-xl" onClick={() => navigate('/auth?tab=signup')}>
+              <Button className="w-full gradient-primary border-0 text-lg py-6 rounded-xl" onClick={() => window.open(currentPrice.stripeLink, '_blank')}>
                 Começar 7 dias grátis
               </Button>
               <p className="text-xs text-muted-foreground mt-3">Sem cartão de crédito para começar</p>
