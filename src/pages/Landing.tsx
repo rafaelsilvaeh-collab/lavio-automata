@@ -112,13 +112,12 @@ const Landing = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Veja o Lavgo em ação</h2>
           <p className="text-muted-foreground mb-10 max-w-lg mx-auto">Conheça as principais telas do sistema que vai transformar seu lava-rápido.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {[
               { src: "/screenshots/dashboard.jpg", title: "Painel principal", desc: "Visão geral do seu negócio em tempo real" },
               { src: "/screenshots/clientes.jpg", title: "CRM de clientes", desc: "Cadastro completo com histórico de serviços" },
               { src: "/screenshots/patio.jpg", title: "Gestão do pátio", desc: "Controle de carros em tempo real" },
               { src: "/screenshots/caixa.jpg", title: "Controle financeiro", desc: "Entradas e saídas do dia organizadas" },
-              { src: "/screenshots/whatsapp.jpg", title: "Mensagens automáticas", desc: "Aviso automático quando o carro fica pronto" },
             ].map((item, i) => (
               <Card key={i} className="border-border/50 overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video overflow-hidden">
