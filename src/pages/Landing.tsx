@@ -107,18 +107,36 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Video */}
-      <section id="video" className="py-16 md:py-24 bg-secondary/50">
+      {/* Screenshots */}
+      <section id="screenshots" className="py-16 md:py-24 bg-secondary/50">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Veja o Lavgo em ação</h2>
-          <p className="text-muted-foreground mb-10 max-w-lg mx-auto">Cadastre o carro, defina o serviço e o Lavgo avisa o cliente automaticamente. Simples assim.</p>
-          <div className="max-w-3xl mx-auto aspect-video bg-card rounded-2xl border shadow-lg flex items-center justify-center">
-            <div className="text-center">
-              <div className="gradient-primary w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:scale-105 transition-transform">
-                <Play className="h-10 w-10 text-primary-foreground ml-1" />
-              </div>
-              <p className="text-muted-foreground">Vídeo demonstrativo em breve</p>
-            </div>
+          <p className="text-muted-foreground mb-10 max-w-lg mx-auto">Conheça as principais telas do sistema que vai transformar seu lava-rápido.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { src: "/screenshots/dashboard.jpg", title: "Painel principal", desc: "Visão geral do seu negócio em tempo real" },
+              { src: "/screenshots/clientes.jpg", title: "CRM de clientes", desc: "Cadastro completo com histórico de serviços" },
+              { src: "/screenshots/patio.jpg", title: "Gestão do pátio", desc: "Controle de carros em tempo real" },
+              { src: "/screenshots/caixa.jpg", title: "Controle financeiro", desc: "Entradas e saídas do dia organizadas" },
+              { src: "/screenshots/whatsapp.jpg", title: "Mensagens automáticas", desc: "Aviso automático quando o carro fica pronto" },
+            ].map((item, i) => (
+              <Card key={i} className="border-border/50 overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="aspect-video overflow-hidden">
+                  <img
+                    src={item.src}
+                    alt={item.title}
+                    loading="lazy"
+                    width={800}
+                    height={512}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-4 pt-4">
+                  <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
