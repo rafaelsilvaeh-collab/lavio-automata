@@ -24,7 +24,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Droplets className="h-7 w-7 text-primary" />
-            <span className="text-xl font-bold text-foreground">Lavio</span>
+            <span className="text-xl font-bold text-foreground">Lavgo</span>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/auth')}>Entrar</Button>
@@ -48,7 +48,7 @@ const Landing = () => {
             O problema não é falta de organização. <strong className="text-primary-foreground">É falta de automação no atendimento.</strong>
           </p>
           <p className="text-lg md:text-xl text-primary-foreground/80 mb-10 max-w-2xl mx-auto">
-            O <strong>Lavio</strong> avisa automaticamente o cliente quando o carro fica pronto, organiza seu caixa e mantém seus clientes voltando.
+            O <strong>Lavgo</strong> avisa automaticamente o cliente quando o carro fica pronto, organiza seu caixa e mantém seus clientes voltando.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" onClick={() => navigate('/auth?tab=signup')} className="gradient-primary border-0 text-lg px-8 py-6 rounded-xl shadow-lg">
@@ -110,8 +110,8 @@ const Landing = () => {
       {/* Video */}
       <section id="video" className="py-16 md:py-24 bg-secondary/50">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Veja o Lavio em ação</h2>
-          <p className="text-muted-foreground mb-10 max-w-lg mx-auto">Cadastre o carro, defina o serviço e o Lavio avisa o cliente automaticamente. Simples assim.</p>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Veja o Lavgo em ação</h2>
+          <p className="text-muted-foreground mb-10 max-w-lg mx-auto">Cadastre o carro, defina o serviço e o Lavgo avisa o cliente automaticamente. Simples assim.</p>
           <div className="max-w-3xl mx-auto aspect-video bg-card rounded-2xl border shadow-lg flex items-center justify-center">
             <div className="text-center">
               <div className="gradient-primary w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:scale-105 transition-transform">
@@ -184,7 +184,7 @@ const Landing = () => {
               <div className="gradient-primary w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Droplets className="h-7 w-7 text-primary-foreground" />
               </div>
-              <h3 className="text-2xl font-bold text-foreground mb-2">Lavio</h3>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Lavgo</h3>
               <div className="mb-6">
                 <span className="text-4xl font-bold text-foreground">R${currentPrice.price.toFixed(2).replace('.', ',')}</span>
                 <span className="text-muted-foreground">/mês</span>
@@ -219,15 +219,15 @@ const Landing = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
               <Droplets className="h-6 w-6 text-primary" />
-              <span className="text-lg font-bold text-primary-foreground">Lavio</span>
+              <span className="text-lg font-bold text-primary-foreground">Lavgo</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4" />
-              <a href="mailto:suporte@lavio.app" className="hover:text-primary-foreground transition-colors">
-                suporte@lavio.app
+              <a href="mailto:suporte@lavgo.app" className="hover:text-primary-foreground transition-colors">
+                suporte@lavgo.app
               </a>
             </div>
-            <p className="text-sm text-primary-foreground/50">© 2024 Lavio. Todos os direitos reservados.</p>
+            <p className="text-sm text-primary-foreground/50">© 2024 Lavgo. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>

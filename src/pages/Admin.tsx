@@ -20,9 +20,9 @@ const Admin = () => {
   const [editingLanding, setEditingLanding] = useState(false);
 
   const mockUsers = [
-    { id: '1', name: 'Lava Rápido do João', email: 'joao@email.com', plan: 'Lavio', status: 'active', since: '2024-01-15' },
+    { id: '1', name: 'Lava Rápido do João', email: 'joao@email.com', plan: 'Lavgo', status: 'active', since: '2024-01-15' },
     { id: '2', name: 'Auto Wash Maria', email: 'maria@email.com', plan: 'Trial', status: 'trial', since: '2024-03-01' },
-    { id: '3', name: 'Super Clean Pedro', email: 'pedro@email.com', plan: 'Lavio', status: 'inactive', since: '2024-02-10' },
+    { id: '3', name: 'Super Clean Pedro', email: 'pedro@email.com', plan: 'Lavgo', status: 'inactive', since: '2024-02-10' },
   ];
 
   const metrics = [

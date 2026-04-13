@@ -98,7 +98,7 @@ const Auth = () => {
               <Droplets className="h-6 w-6 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Lavio</CardTitle>
+          <CardTitle className="text-2xl">Lavgo</CardTitle>
           <CardDescription>Gestão inteligente para seu lava-rápido</CardDescription>
         </CardHeader>
         <CardContent>
