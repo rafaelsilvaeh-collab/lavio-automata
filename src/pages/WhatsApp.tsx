@@ -50,13 +50,11 @@ const WhatsApp = () => {
       setLoadingConfig(true);
       const { data } = await supabase
         .from("whatsapp_config")
-        .select("*")
+        .select("id, user_id, is_connected, phone_number, created_at, updated_at")
         .maybeSingle();
 
       if (data) {
-        setConfig(data);
-        setInstanceId(data.instance_id || "");
-        setApiKey(data.api_key || "");
+        setConfig(data as WhatsAppConfig);
         setConnected(data.is_connected);
       }
       setLoadingConfig(false);
@@ -115,9 +113,9 @@ const WhatsApp = () => {
       await invokeWhatsApp("save-config", { instance_id: instanceId, api_key: apiKey });
       toast.success("Configuração salva!");
       // Reload config
-      const { data } = await supabase.from("whatsapp_config").select("*").maybeSingle();
+      const { data } = await supabase.from("whatsapp_config").select("id, user_id, is_connected, phone_number, created_at, updated_at").maybeSingle();
       if (data) {
-        setConfig(data);
+        setConfig(data as WhatsAppConfig);
         setConnected(data.is_connected);
       }
     } catch (err: any) {
