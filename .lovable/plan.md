@@ -1,23 +1,31 @@
 
 
-# Criar usuário administrador do Lavgo
+# Substituir seção de vídeo por cards com imagens das telas do app
 
-## Credenciais
-- **E-mail:** Rafael.silva.eh@gmail.com
-- **Senha:** Dara3770@
+## O que muda
 
-## Passos
+A seção "Veja o Lavgo em ação" (vídeo placeholder) será substituída por uma galeria de cards mostrando as principais telas do aplicativo.
 
-1. **Criar edge function temporária** (`create-admin`) que usa o `SUPABASE_SERVICE_ROLE_KEY` para:
-   - Criar o usuário via `supabase.auth.admin.createUser()` com e-mail confirmado automaticamente
-   - Inserir a role `admin` na tabela `user_roles`
+## Cards planejados
 
-2. **Invocar a edge function** para criar a conta
+| Card | Título | Descrição |
+|------|--------|-----------|
+| Dashboard | Painel principal | Visão geral do seu negócio em tempo real |
+| Clientes | CRM de clientes | Cadastro completo com histórico de serviços |
+| Pátio | Gestão do pátio | Controle de carros em tempo real |
+| Caixa do Dia | Controle financeiro | Entradas e saídas do dia organizadas |
+| WhatsApp | Mensagens automáticas | Aviso automático quando o carro fica pronto |
 
-3. **Remover a edge function** após uso (segurança)
+## Implementação
 
-## Detalhes técnicos
-- A edge function usará `createClient` com a service role key para ter permissões administrativas
-- O usuário será criado com `email_confirm: true` para pular verificação de e-mail
-- A role `admin` será inserida na tabela `user_roles` vinculada ao `user_id` do novo usuário
+1. **Gerar screenshots** das páginas do app (Dashboard, Clientes, Pátio, Caixa, WhatsApp) e salvar em `public/screenshots/`
+2. **Substituir a seção de vídeo** (`lines 110-127` em Landing.tsx) por um grid de cards com:
+   - Imagem da tela com borda arredondada e sombra
+   - Título e descrição curta abaixo da imagem
+   - Layout responsivo: 1 coluna mobile, 2 colunas tablet, 3 colunas desktop
+3. **Atualizar o link "Ver como funciona"** no hero para rolar até a nova seção (manter o `id="video"` ou renomear para `id="screenshots"`)
+
+## Detalhe técnico
+
+Como não temos screenshots reais disponíveis, usaremos placeholders visuais estilizados (mockups com ícones e cores do app representando cada tela) que podem ser substituídos por imagens reais depois. Cada card terá um fundo gradiente com o ícone da página correspondente simulando a tela.
 
