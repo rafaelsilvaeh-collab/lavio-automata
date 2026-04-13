@@ -1,31 +1,20 @@
 
 
-# Substituir seção de vídeo por cards com imagens das telas do app
+# Substituir cards por screenshots reais
 
 ## O que muda
 
-A seção "Veja o Lavgo em ação" (vídeo placeholder) será substituída por uma galeria de cards mostrando as principais telas do aplicativo.
+Substituir os 5 cards placeholder na seção "Veja o Lavgo em ação" pelos 4 screenshots reais enviados, removendo o card "WhatsApp" (excedente).
 
-## Cards planejados
+## Passos
 
-| Card | Título | Descrição |
-|------|--------|-----------|
-| Dashboard | Painel principal | Visão geral do seu negócio em tempo real |
-| Clientes | CRM de clientes | Cadastro completo com histórico de serviços |
-| Pátio | Gestão do pátio | Controle de carros em tempo real |
-| Caixa do Dia | Controle financeiro | Entradas e saídas do dia organizadas |
-| WhatsApp | Mensagens automáticas | Aviso automático quando o carro fica pronto |
+1. **Copiar as 4 imagens** enviadas para `public/screenshots/`, substituindo os placeholders:
+   - `IMG_1218.jpeg` → `public/screenshots/dashboard.jpg` (Dashboard)
+   - `IMG_1220.jpeg` → `public/screenshots/clientes.jpg` (Clientes)
+   - `IMG_1221.jpeg` → `public/screenshots/patio.jpg` (Pátio)
+   - `IMG_1222.jpeg` → `public/screenshots/caixa.jpg` (Caixa do Dia)
 
-## Implementação
+2. **Remover `public/screenshots/whatsapp.jpg`** (sem screenshot correspondente)
 
-1. **Gerar screenshots** das páginas do app (Dashboard, Clientes, Pátio, Caixa, WhatsApp) e salvar em `public/screenshots/`
-2. **Substituir a seção de vídeo** (`lines 110-127` em Landing.tsx) por um grid de cards com:
-   - Imagem da tela com borda arredondada e sombra
-   - Título e descrição curta abaixo da imagem
-   - Layout responsivo: 1 coluna mobile, 2 colunas tablet, 3 colunas desktop
-3. **Atualizar o link "Ver como funciona"** no hero para rolar até a nova seção (manter o `id="video"` ou renomear para `id="screenshots"`)
-
-## Detalhe técnico
-
-Como não temos screenshots reais disponíveis, usaremos placeholders visuais estilizados (mockups com ícones e cores do app representando cada tela) que podem ser substituídos por imagens reais depois. Cada card terá um fundo gradiente com o ícone da página correspondente simulando a tela.
+3. **Atualizar `src/pages/Landing.tsx`**: remover o item WhatsApp do array de screenshots, mantendo apenas os 4 cards. Ajustar o grid para `lg:grid-cols-2` (2x2) já que agora são 4 cards.
 
