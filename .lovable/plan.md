@@ -1,18 +1,23 @@
 
 
-# Renomear SaaS de "Lavio" para "Lavgo"
+# Criar usuário administrador do Lavgo
 
-Substituição direta de texto em 5 arquivos. Nenhuma mudança de banco de dados necessária.
+## Credenciais
+- **E-mail:** Rafael.silva.eh@gmail.com
+- **Senha:** Dara3770@
 
-## Arquivos e mudanças
+## Passos
 
-| Arquivo | Mudança |
-|---|---|
-| `index.html` | Title e meta tags: "Lovable App" → "Lavgo" |
-| `src/pages/Landing.tsx` | Todas as ocorrências de "Lavio" → "Lavgo", email `suporte@lavio.app` → `suporte@lavgo.app` |
-| `src/pages/Auth.tsx` | CardTitle "Lavio" → "Lavgo" |
-| `src/components/AppSidebar.tsx` | Nome na sidebar "Lavio" → "Lavgo" |
-| `src/pages/Admin.tsx` | Textos e mock data "Lavio" → "Lavgo" |
+1. **Criar edge function temporária** (`create-admin`) que usa o `SUPABASE_SERVICE_ROLE_KEY` para:
+   - Criar o usuário via `supabase.auth.admin.createUser()` com e-mail confirmado automaticamente
+   - Inserir a role `admin` na tabela `user_roles`
 
-Total: ~15 substituições de texto simples.
+2. **Invocar a edge function** para criar a conta
+
+3. **Remover a edge function** após uso (segurança)
+
+## Detalhes técnicos
+- A edge function usará `createClient` com a service role key para ter permissões administrativas
+- O usuário será criado com `email_confirm: true` para pular verificação de e-mail
+- A role `admin` será inserida na tabela `user_roles` vinculada ao `user_id` do novo usuário
 
