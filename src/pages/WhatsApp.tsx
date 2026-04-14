@@ -1,19 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, QrCode, Wifi, WifiOff, RefreshCw, Power, Edit2, Save, Send, Settings, Loader2 } from "lucide-react";
+import { MessageSquare, QrCode, Wifi, WifiOff, RefreshCw, Power, Edit2, Save, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Tables } from "@/integrations/supabase/types";
 
-type WhatsAppConfig = Tables<"whatsapp_config">;
 type MessageTemplate = Tables<"message_templates">;
 type Customer = Tables<"customers">;
 
@@ -21,15 +19,12 @@ const WhatsApp = () => {
   const { user } = useAuth();
 
   // Connection state
-  const [config, setConfig] = useState<WhatsAppConfig | null>(null);
-  const [instanceId, setInstanceId] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [connected, setConnected] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
-  const [loadingConfig, setLoadingConfig] = useState(true);
-  const [savingConfig, setSavingConfig] = useState(false);
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [loadingQr, setLoadingQr] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Templates state
   const [templates, setTemplates] = useState<Record<string, MessageTemplate>>({});
@@ -43,56 +38,6 @@ const WhatsApp = () => {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Load config
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      setLoadingConfig(true);
-      const { data } = await supabase
-        .from("whatsapp_config")
-        .select("id, user_id, is_connected, phone_number, created_at, updated_at")
-        .maybeSingle();
-
-      if (data) {
-        setConfig(data as WhatsAppConfig);
-        setConnected(data.is_connected);
-      }
-      setLoadingConfig(false);
-    };
-    load();
-  }, [user]);
-
-  // Load templates
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const { data } = await supabase
-        .from("message_templates")
-        .select("*");
-
-      if (data && data.length > 0) {
-        const map: Record<string, MessageTemplate> = {};
-        data.forEach((t) => (map[t.template_type] = t));
-        setTemplates(map);
-      }
-    };
-    load();
-  }, [user]);
-
-  // Load customers
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-      setCustomers(data || []);
-    };
-    load();
-  }, [user]);
-
   const invokeWhatsApp = async (action: string, extra: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke("whatsapp", {
       body: { action, ...extra },
@@ -102,54 +47,97 @@ const WhatsApp = () => {
     return data;
   };
 
-  // Save Z-API config
-  const handleSaveConfig = async () => {
-    if (!instanceId || !apiKey) {
-      toast.error("Preencha o Instance ID e o Token");
+  // Check initial status
+  useEffect(() => {
+    if (!user) return;
+    const checkInitial = async () => {
+      try {
+        const data = await invokeWhatsApp("check-status");
+        setConnected(data?.conectado === true);
+      } catch {
+        // Not configured yet, that's fine
+      }
+      setInitialLoading(false);
+    };
+    checkInitial();
+  }, [user]);
+
+  // Load templates & customers
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const [{ data: tplData }, { data: custData }] = await Promise.all([
+        supabase.from("message_templates").select("*"),
+        supabase.from("customers").select("*").eq("is_active", true).order("name"),
+      ]);
+      if (tplData && tplData.length > 0) {
+        const map: Record<string, MessageTemplate> = {};
+        tplData.forEach((t) => (map[t.template_type] = t));
+        setTemplates(map);
+      }
+      setCustomers(custData || []);
+    };
+    load();
+  }, [user]);
+
+  // Polling for connection status while QR is showing
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!qrCodeBase64 || connected) {
+      stopPolling();
       return;
     }
-    setSavingConfig(true);
-    try {
-      await invokeWhatsApp("save-config", { instance_id: instanceId, api_key: apiKey });
-      toast.success("Configuração salva!");
-      // Reload config
-      const { data } = await supabase.from("whatsapp_config").select("id, user_id, is_connected, phone_number, created_at, updated_at").maybeSingle();
-      if (data) {
-        setConfig(data as WhatsAppConfig);
-        setConnected(data.is_connected);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao salvar configuração");
-    }
-    setSavingConfig(false);
-  };
 
-  // Generate QR Code
-  const handleGetQrCode = async () => {
+    pollingRef.current = setInterval(async () => {
+      try {
+        const data = await invokeWhatsApp("check-status");
+        if (data?.conectado === true) {
+          setConnected(true);
+          setQrCodeBase64(null);
+          stopPolling();
+          toast.success("WhatsApp conectado!");
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 5000);
+
+    return stopPolling;
+  }, [qrCodeBase64, connected, stopPolling]);
+
+  // Connect: create instance + get QR
+  const handleConnect = async () => {
     setLoadingQr(true);
-    setQrCodeUrl(null);
+    setQrCodeBase64(null);
     try {
+      await invokeWhatsApp("create-instance");
       const data = await invokeWhatsApp("get-qrcode");
-      if (data?.value) {
-        setQrCodeUrl(data.value);
-      } else if (data?.image) {
-        setQrCodeUrl(data.image);
+      const base64 = data?.qrcode?.base64 || data?.base64;
+      if (base64) {
+        setQrCodeBase64(base64);
       } else {
-        toast.info("QR Code não disponível. Verifique se a instância está correta.");
+        toast.info("QR Code não disponível. Tente novamente em alguns segundos.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao gerar QR Code");
+      toast.error(err.message || "Erro ao conectar WhatsApp");
     }
     setLoadingQr(false);
   };
 
-  // Check status
+  // Check status manually
   const handleCheckStatus = async () => {
     setCheckingStatus(true);
     try {
       const data = await invokeWhatsApp("check-status");
-      const isConn = data?.is_connected === true;
+      const isConn = data?.conectado === true;
       setConnected(isConn);
+      if (isConn) setQrCodeBase64(null);
       toast.success(isConn ? "WhatsApp conectado!" : "WhatsApp desconectado");
     } catch (err: any) {
       toast.error(err.message || "Erro ao verificar status");
@@ -162,7 +150,7 @@ const WhatsApp = () => {
     try {
       await invokeWhatsApp("disconnect");
       setConnected(false);
-      setQrCodeUrl(null);
+      setQrCodeBase64(null);
       toast.info("WhatsApp desconectado");
     } catch (err: any) {
       toast.error(err.message || "Erro ao desconectar");
@@ -230,7 +218,6 @@ const WhatsApp = () => {
     setSending(false);
   };
 
-  // Apply template to send textarea
   const applyTemplate = (type: string) => {
     const tpl = templates[type];
     if (!tpl) return;
@@ -252,7 +239,13 @@ const WhatsApp = () => {
     setEditing(type);
   };
 
-  const hasConfig = !!(config?.instance_id && config?.api_key);
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -270,53 +263,15 @@ const WhatsApp = () => {
 
         {/* CONNECTION TAB */}
         <TabsContent value="connection" className="space-y-6 mt-4">
-          {/* Z-API Config */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" /> Configuração Z-API
-              </CardTitle>
-              <CardDescription>Insira suas credenciais da Z-API para conectar</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Instance ID</Label>
-                <Input
-                  placeholder="Ex: 3C5A8B..."
-                  value={instanceId}
-                  onChange={(e) => setInstanceId(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Token (API Key)</Label>
-                <Input
-                  type="password"
-                  placeholder="Seu token Z-API"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </div>
-              <Button
-                onClick={handleSaveConfig}
-                disabled={savingConfig}
-                className="gradient-primary border-0"
-              >
-                {savingConfig ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Salvar configuração
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Connection Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" /> Conectar WhatsApp
               </CardTitle>
               <CardDescription>
-                {hasConfig
-                  ? "Gere o QR Code e escaneie com seu WhatsApp"
-                  : "Salve a configuração Z-API primeiro"}
+                {connected
+                  ? "Seu WhatsApp está conectado e pronto para enviar mensagens"
+                  : "Clique em conectar e escaneie o QR Code com seu WhatsApp"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -345,8 +300,8 @@ const WhatsApp = () => {
                   <div className="w-64 h-64 mx-auto bg-secondary rounded-2xl flex items-center justify-center mb-6 border-2 border-dashed border-border overflow-hidden">
                     {loadingQr ? (
                       <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-                    ) : qrCodeUrl ? (
-                      <img src={qrCodeUrl} alt="QR Code" className="w-full h-full object-contain" />
+                    ) : qrCodeBase64 ? (
+                      <img src={qrCodeBase64} alt="QR Code" className="w-full h-full object-contain p-2" />
                     ) : (
                       <div className="text-center">
                         <QrCode className="h-16 w-16 text-muted-foreground mx-auto mb-3" />
@@ -357,15 +312,16 @@ const WhatsApp = () => {
                   <div className="flex gap-3 justify-center flex-wrap">
                     <Button
                       className="gradient-primary border-0"
-                      onClick={handleGetQrCode}
-                      disabled={!hasConfig || loadingQr}
+                      onClick={handleConnect}
+                      disabled={loadingQr}
                     >
-                      <QrCode className="mr-2 h-4 w-4" /> Gerar QR Code
+                      <QrCode className="mr-2 h-4 w-4" />
+                      {qrCodeBase64 ? "Reconectar" : "Conectar WhatsApp"}
                     </Button>
                     <Button
                       variant="outline"
                       onClick={handleCheckStatus}
-                      disabled={!hasConfig || checkingStatus}
+                      disabled={checkingStatus}
                     >
                       {checkingStatus ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -375,9 +331,11 @@ const WhatsApp = () => {
                       Verificar status
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Abra o WhatsApp no celular → Menu → Aparelhos conectados → Conectar
-                  </p>
+                  {qrCodeBase64 && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Abra o WhatsApp no celular → Menu → Aparelhos conectados → Conectar
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="flex gap-3">
@@ -388,6 +346,15 @@ const WhatsApp = () => {
                       <RefreshCw className="mr-2 h-4 w-4" />
                     )}
                     Verificar status
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setConnected(false);
+                      handleConnect();
+                    }}
+                  >
+                    <QrCode className="mr-2 h-4 w-4" /> Reconectar
                   </Button>
                   <Button variant="destructive" onClick={handleDisconnect}>
                     <Power className="mr-2 h-4 w-4" /> Desconectar
@@ -400,7 +367,6 @@ const WhatsApp = () => {
 
         {/* TEMPLATES TAB */}
         <TabsContent value="templates" className="space-y-4 mt-4">
-          {/* Car ready template */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -414,34 +380,18 @@ const WhatsApp = () => {
             <CardContent>
               {editing === "carro_pronto" ? (
                 <div className="space-y-3">
-                  <Textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Variáveis: {"{nome}"}, {"{placa}"}, {"{servico}"}
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => handleSaveTemplate("carro_pronto")}
-                    disabled={savingTemplate}
-                  >
+                  <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={3} />
+                  <p className="text-xs text-muted-foreground">Variáveis: {"{nome}"}, {"{placa}"}, {"{servico}"}</p>
+                  <Button size="sm" onClick={() => handleSaveTemplate("carro_pronto")} disabled={savingTemplate}>
                     <Save className="mr-2 h-3 w-3" /> Salvar
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-start justify-between">
                   <p className="text-sm text-muted-foreground bg-secondary/50 p-3 rounded-lg flex-1">
-                    {templates.carro_pronto?.message_text ||
-                      "Nenhum template configurado. Clique em editar."}
+                    {templates.carro_pronto?.message_text || "Nenhum template configurado. Clique em editar."}
                   </p>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="ml-2"
-                    onClick={() => startEditing("carro_pronto")}
-                  >
+                  <Button size="icon" variant="ghost" className="ml-2" onClick={() => startEditing("carro_pronto")}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -449,7 +399,6 @@ const WhatsApp = () => {
             </CardContent>
           </Card>
 
-          {/* Inactive client template */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -463,34 +412,18 @@ const WhatsApp = () => {
             <CardContent>
               {editing === "cliente_inativo" ? (
                 <div className="space-y-3">
-                  <Textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Variáveis: {"{nome}"}, {"{dias}"}
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => handleSaveTemplate("cliente_inativo")}
-                    disabled={savingTemplate}
-                  >
+                  <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={3} />
+                  <p className="text-xs text-muted-foreground">Variáveis: {"{nome}"}, {"{dias}"}</p>
+                  <Button size="sm" onClick={() => handleSaveTemplate("cliente_inativo")} disabled={savingTemplate}>
                     <Save className="mr-2 h-3 w-3" /> Salvar
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-start justify-between">
                   <p className="text-sm text-muted-foreground bg-secondary/50 p-3 rounded-lg flex-1">
-                    {templates.cliente_inativo?.message_text ||
-                      "Nenhum template configurado. Clique em editar."}
+                    {templates.cliente_inativo?.message_text || "Nenhum template configurado. Clique em editar."}
                   </p>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="ml-2"
-                    onClick={() => startEditing("cliente_inativo")}
-                  >
+                  <Button size="icon" variant="ghost" className="ml-2" onClick={() => startEditing("cliente_inativo")}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -543,24 +476,11 @@ const WhatsApp = () => {
 
               <div>
                 <Label>Mensagem</Label>
-                <Textarea
-                  rows={4}
-                  placeholder="Digite sua mensagem..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                />
+                <Textarea rows={4} placeholder="Digite sua mensagem..." value={message} onChange={(e) => setMessage(e.target.value)} />
               </div>
 
-              <Button
-                className="w-full gradient-primary border-0"
-                onClick={handleSend}
-                disabled={sending || !connected}
-              >
-                {sending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
+              <Button className="w-full gradient-primary border-0" onClick={handleSend} disabled={sending || !connected}>
+                {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                 {connected ? "Enviar mensagem" : "Conecte o WhatsApp primeiro"}
               </Button>
             </CardContent>

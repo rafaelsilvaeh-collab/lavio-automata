@@ -12,6 +12,18 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[WHATSAPP] ${step}${d}`);
 };
 
+function getEvolutionConfig() {
+  const url = Deno.env.get("EVOLUTION_API_URL");
+  const key = Deno.env.get("EVOLUTION_API_KEY");
+  if (!url) throw new Error("EVOLUTION_API_URL não configurada");
+  if (!key) throw new Error("EVOLUTION_API_KEY não configurada");
+  return { url: url.replace(/\/$/, ""), key };
+}
+
+function buildInstanceName(userId: string): string {
+  return `lavgo_${userId.replace(/-/g, "").slice(0, 16)}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -33,65 +45,67 @@ serve(async (req) => {
     if (userError || !userData.user) throw new Error("Usuário inválido");
 
     const userId = userData.user.id;
-    logStep("User authenticated", { userId });
-
-    // Get user's Z-API config
-    const { data: config, error: configError } = await supabase
-      .from("whatsapp_config")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (configError) throw new Error(`Erro ao buscar config: ${configError.message}`);
+    const instanceName = buildInstanceName(userId);
+    logStep("User authenticated", { userId, instanceName });
 
     const body = await req.json();
     const { action } = body;
-
     if (!action) throw new Error("Ação não especificada");
 
     logStep("Action requested", { action });
 
-    // Actions that don't require a connected instance
-    if (action === "save-config") {
-      const { instance_id, api_key } = body;
-      if (!instance_id || !api_key) throw new Error("instance_id e api_key são obrigatórios");
+    if (action === "create-instance") {
+      const { url, key } = getEvolutionConfig();
 
-      const upsertData = {
-        user_id: userId,
-        instance_id,
-        api_key,
-        is_connected: false,
-        updated_at: new Date().toISOString(),
-      };
+      const res = await fetch(`${url}/instance/create`, {
+        method: "POST",
+        headers: { apikey: key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instanceName,
+          qrcode: true,
+          integration: "WHATSAPP-BAILEYS",
+        }),
+      });
 
-      if (config) {
-        const { error } = await supabase
-          .from("whatsapp_config")
-          .update(upsertData)
-          .eq("user_id", userId);
-        if (error) throw new Error(`Erro ao salvar: ${error.message}`);
-      } else {
-        const { error } = await supabase
-          .from("whatsapp_config")
-          .insert(upsertData);
-        if (error) throw new Error(`Erro ao salvar: ${error.message}`);
+      const data = await res.json();
+      logStep("Instance create response", { status: res.status });
+
+      // If instance already exists, ignore error silently
+      if (!res.ok && !JSON.stringify(data).toLowerCase().includes("already")) {
+        throw new Error(`Erro ao criar instância: ${JSON.stringify(data)}`);
       }
 
-      logStep("Config saved");
-      return new Response(JSON.stringify({ success: true }), {
+      // Upsert whatsapp_config
+      const { data: existing } = await supabase
+        .from("whatsapp_config")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("whatsapp_config")
+          .update({ instance_id: instanceName, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+      } else {
+        await supabase
+          .from("whatsapp_config")
+          .insert({ user_id: userId, instance_id: instanceName, is_connected: false });
+      }
+
+      return new Response(JSON.stringify({ success: true, instanceName }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // All other actions require config
-    if (!config?.instance_id || !config?.api_key) {
-      throw new Error("WhatsApp não configurado. Adicione seu Instance ID e Token Z-API.");
-    }
-
-    const baseUrl = `https://api.z-api.io/instances/${config.instance_id}/token/${config.api_key}`;
-
     if (action === "get-qrcode") {
-      const res = await fetch(`${baseUrl}/qr-code/image`, { method: "GET" });
+      const { url, key } = getEvolutionConfig();
+
+      const res = await fetch(`${url}/instance/connect/${instanceName}`, {
+        method: "GET",
+        headers: { apikey: key },
+      });
+
       const data = await res.json();
       logStep("QR code fetched", { status: res.status });
 
@@ -101,46 +115,54 @@ serve(async (req) => {
     }
 
     if (action === "check-status") {
-      const res = await fetch(`${baseUrl}/status`, { method: "GET" });
+      const { url, key } = getEvolutionConfig();
+
+      const res = await fetch(`${url}/instance/connectionState/${instanceName}`, {
+        method: "GET",
+        headers: { apikey: key },
+      });
+
       const data = await res.json();
       logStep("Status checked", { status: res.status, data });
 
-      const isConnected = data?.connected === true;
+      const state = data?.instance?.state || data?.state || "close";
+      const isConnected = state === "open";
 
       // Update connection status in DB
       await supabase
         .from("whatsapp_config")
         .update({
           is_connected: isConnected,
-          phone_number: data?.phoneNumber || config.phone_number,
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", userId);
 
-      return new Response(JSON.stringify({ ...data, is_connected: isConnected }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ conectado: isConnected, estado: state }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     if (action === "send-message") {
       const { phone, message } = body;
       if (!phone || !message) throw new Error("phone e message são obrigatórios");
 
-      // Clean phone number (keep only digits, add 55 if needed)
+      const { url, key } = getEvolutionConfig();
+
       let cleanPhone = phone.replace(/\D/g, "");
       if (cleanPhone.length <= 11) cleanPhone = `55${cleanPhone}`;
 
-      const res = await fetch(`${baseUrl}/send-text`, {
+      const res = await fetch(`${url}/message/sendText/${instanceName}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, message }),
+        headers: { apikey: key, "Content-Type": "application/json" },
+        body: JSON.stringify({ number: cleanPhone, text: message }),
       });
 
       const data = await res.json();
       logStep("Message sent", { status: res.status, phone: cleanPhone });
 
       if (!res.ok) {
-        throw new Error(`Z-API erro: ${JSON.stringify(data)}`);
+        throw new Error(`Evolution API erro: ${JSON.stringify(data)}`);
       }
 
       return new Response(JSON.stringify({ success: true, ...data }), {
@@ -149,7 +171,13 @@ serve(async (req) => {
     }
 
     if (action === "disconnect") {
-      const res = await fetch(`${baseUrl}/logout`, { method: "POST" });
+      const { url, key } = getEvolutionConfig();
+
+      const res = await fetch(`${url}/instance/logout/${instanceName}`, {
+        method: "DELETE",
+        headers: { apikey: key },
+      });
+
       const data = await res.json();
 
       await supabase

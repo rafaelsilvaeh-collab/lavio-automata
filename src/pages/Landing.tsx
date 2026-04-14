@@ -1,21 +1,49 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Mail } from "lucide-react";
+import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Mail, Unlock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'semiannual' | 'annual'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'semiannual' | 'annual'>('semiannual');
 
-  const prices = {
-    monthly: { price: 110, label: 'Mensal', discount: null, stripeLink: 'https://buy.stripe.com/cNi7sLfz20Q5fw22P12Ry09' },
-    semiannual: { price: 96.80, label: 'Semestral', discount: '12% OFF', stripeLink: 'https://buy.stripe.com/6oU6oHbiM7et0B8gFR2Ry0a' },
-    annual: { price: 85.80, label: 'Anual', discount: '22% OFF', stripeLink: 'https://buy.stripe.com/dRm3cv3QkfKZ3Nk0GT2Ry0b' },
-  };
+  const plans = [
+    {
+      key: 'monthly' as const,
+      label: 'Mensal',
+      price: 149,
+      discount: null,
+      stripeLink: 'https://buy.stripe.com/cNi7sLfz20Q5fw22P12Ry09',
+      popular: false,
+    },
+    {
+      key: 'semiannual' as const,
+      label: 'Semestral',
+      price: 129,
+      discount: '13% OFF',
+      stripeLink: 'https://buy.stripe.com/6oU6oHbiM7et0B8gFR2Ry0a',
+      popular: true,
+    },
+    {
+      key: 'annual' as const,
+      label: 'Anual',
+      price: 109,
+      discount: '27% OFF',
+      stripeLink: 'https://buy.stripe.com/dRm3cv3QkfKZ3Nk0GT2Ry0b',
+      popular: false,
+    },
+  ];
 
-  const currentPrice = prices[billingCycle];
+  const features = [
+    "CRM de clientes ilimitado",
+    "Gestão do pátio em tempo real",
+    "WhatsApp automático",
+    "Caixa do dia completo",
+    "Mensagens automáticas",
+    "Suporte via WhatsApp",
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,27 +97,9 @@ const Landing = () => {
           </h2>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
-              {
-                icon: Bell,
-                title: "Automação melhora satisfação",
-                description: "Sistemas que enviam notificações automáticas reduzem ligações e aumentam a satisfação do cliente ao avisar quando o serviço está pronto.",
-                stat: "+40%",
-                statLabel: "satisfação"
-              },
-              {
-                icon: Clock,
-                title: "Clientes valorizam rapidez",
-                description: "Otimizar processos e informar tempo de espera melhora a experiência e aumenta a fidelização dos seus clientes.",
-                stat: "3x",
-                statLabel: "mais retorno"
-              },
-              {
-                icon: TrendingUp,
-                title: "Controle financeiro eficiente",
-                description: "Lava-rápidos que controlam o caixa diariamente têm 60% mais chance de crescer de forma sustentável.",
-                stat: "60%",
-                statLabel: "crescimento"
-              }
+              { icon: Bell, title: "Automação melhora satisfação", description: "Sistemas que enviam notificações automáticas reduzem ligações e aumentam a satisfação do cliente ao avisar quando o serviço está pronto.", stat: "+40%", statLabel: "satisfação" },
+              { icon: Clock, title: "Clientes valorizam rapidez", description: "Otimizar processos e informar tempo de espera melhora a experiência e aumenta a fidelização dos seus clientes.", stat: "3x", statLabel: "mais retorno" },
+              { icon: TrendingUp, title: "Controle financeiro eficiente", description: "Lava-rápidos que controlam o caixa diariamente têm 60% mais chance de crescer de forma sustentável.", stat: "60%", statLabel: "crescimento" },
             ].map((item, i) => (
               <Card key={i} className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
@@ -121,14 +131,7 @@ const Landing = () => {
             ].map((item, i) => (
               <Card key={i} className="border-border/50 overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video overflow-hidden">
-                  <img
-                    src={item.src}
-                    alt={item.title}
-                    loading="lazy"
-                    width={800}
-                    height={512}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={item.src} alt={item.title} loading="lazy" width={800} height={512} className="w-full h-full object-cover" />
                 </div>
                 <CardContent className="p-4 pt-4">
                   <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
@@ -170,63 +173,80 @@ const Landing = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Plano simples, sem surpresas</h2>
           <p className="text-muted-foreground mb-8">Comece com 7 dias grátis. Cancele quando quiser.</p>
-          
-          <div className="flex flex-col sm:flex-row justify-center gap-2 mb-10">
-            {(['monthly', 'semiannual', 'annual'] as const).map((cycle) => (
-              <div key={cycle} className="relative">
-                {cycle === 'semiannual' && (
+
+          {/* Toggle */}
+          <div className="flex justify-center gap-2 mb-10">
+            {plans.map((plan) => (
+              <div key={plan.key} className="relative">
+                {plan.popular && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 bg-orange-500 text-white border-0 text-xs whitespace-nowrap">
-                    Mais vendido
+                    Mais popular
                   </Badge>
                 )}
                 <Button
-                  variant={billingCycle === cycle ? 'default' : 'outline'}
+                  variant={billingCycle === plan.key ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setBillingCycle(cycle)}
-                  className={`w-full sm:w-auto ${billingCycle === cycle ? 'gradient-primary border-0' : ''}`}
+                  onClick={() => setBillingCycle(plan.key)}
+                  className={billingCycle === plan.key ? 'gradient-primary border-0' : ''}
                 >
-                  {prices[cycle].label}
-                  {prices[cycle].discount && (
-                    <Badge className="ml-2 bg-success/10 text-success border-success/20 text-xs">
-                      {prices[cycle].discount}
-                    </Badge>
-                  )}
+                  {plan.label}
                 </Button>
               </div>
             ))}
           </div>
 
-          <Card className="max-w-md mx-auto border-primary/20 shadow-lg">
-            <CardContent className="p-8">
-              <div className="gradient-primary w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Droplets className="h-7 w-7 text-primary-foreground" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-2">Lavgo</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-foreground">R${currentPrice.price.toFixed(2).replace('.', ',')}</span>
-                <span className="text-muted-foreground">/mês</span>
-              </div>
-              <ul className="text-left space-y-3 mb-8">
-                {[
-                  "CRM de clientes ilimitado",
-                  "Gestão do pátio em tempo real",
-                  "WhatsApp automático",
-                  "Caixa do dia completo",
-                  "Mensagens automáticas",
-                  "Suporte via WhatsApp",
-                ].map((feat, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm text-foreground">
-                    <Check className="h-4 w-4 text-success flex-shrink-0" />
-                    {feat}
-                  </li>
-                ))}
-              </ul>
-              <Button className="w-full gradient-primary border-0 text-lg py-6 rounded-xl" onClick={() => window.open(currentPrice.stripeLink, '_blank')}>
-                Começar 7 dias grátis
-              </Button>
-              <p className="text-xs text-muted-foreground mt-3">Sem cartão de crédito para começar</p>
-            </CardContent>
-          </Card>
+          {/* 3 Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {plans.map((plan) => {
+              const isSelected = billingCycle === plan.key;
+              return (
+                <Card
+                  key={plan.key}
+                  className={`border-border/50 transition-all ${
+                    isSelected ? 'border-primary shadow-lg scale-[1.02]' : 'opacity-80'
+                  }`}
+                >
+                  <CardContent className="p-6">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
+                        {plan.label}
+                        {plan.discount && (
+                          <Badge className="bg-success/10 text-success border-success/20 text-xs">
+                            {plan.discount}
+                          </Badge>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold text-foreground">R${plan.price}</span>
+                      <span className="text-muted-foreground">/mês</span>
+                    </div>
+                    <ul className="text-left space-y-2 mb-6">
+                      {features.map((feat, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm text-foreground">
+                          <Check className="h-4 w-4 text-success flex-shrink-0" />
+                          {feat}
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      className={`w-full ${isSelected ? 'gradient-primary border-0' : ''}`}
+                      variant={isSelected ? 'default' : 'outline'}
+                      onClick={() => window.open(plan.stripeLink, '_blank')}
+                    >
+                      Começar grátis
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Trial highlight */}
+          <div className="mt-8 flex items-center justify-center gap-2 text-muted-foreground">
+            <Unlock className="h-5 w-5 text-success" />
+            <span className="text-sm font-medium">7 dias grátis, sem cartão de crédito</span>
+          </div>
         </div>
       </section>
 
