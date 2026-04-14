@@ -167,7 +167,7 @@ serve(async (req) => {
       const res = await fetch(`${url}/message/sendText/${instanceName}`, {
         method: "POST",
         headers: { apikey: key, "Content-Type": "application/json" },
-        body: JSON.stringify({ number: cleanPhone, text: message }),
+        body: JSON.stringify({ number: cleanPhone, textMessage: { text: message } }),
       });
 
       const data = await res.json();
