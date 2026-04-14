@@ -23,7 +23,7 @@ const Landing = () => {
       label: 'Semestral',
       price: 129,
       discount: '13% OFF',
-      stripeLink: 'https://buy.stripe.com/6oU6oHbiM7et0B8gFR2Ry0a',
+      stripeLink: 'https://buy.stripe.com/00w14ncmQ7etdnU2P12Ry0d',
       popular: true,
     },
     {
