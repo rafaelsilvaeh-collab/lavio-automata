@@ -38,11 +38,22 @@ serve(async (req) => {
   try {
     // Authenticate user
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Não autenticado");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Usuário inválido");
+    if (userError || !userData.user) {
+      logStep("Auth failed", { error: userError?.message });
+      return new Response(JSON.stringify({ error: "Sessão expirada. Faça login novamente." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
     const userId = userData.user.id;
     const instanceName = buildInstanceName(userId);

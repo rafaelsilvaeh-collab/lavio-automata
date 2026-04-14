@@ -16,7 +16,7 @@ type MessageTemplate = Tables<"message_templates">;
 type Customer = Tables<"customers">;
 
 const WhatsApp = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   // Connection state
   const [connected, setConnected] = useState(false);
@@ -49,7 +49,10 @@ const WhatsApp = () => {
 
   // Check initial status
   useEffect(() => {
-    if (!user) return;
+    if (!user || !session?.access_token) {
+      setInitialLoading(false);
+      return;
+    }
     const checkInitial = async () => {
       try {
         const data = await invokeWhatsApp("check-status");
@@ -60,11 +63,11 @@ const WhatsApp = () => {
       setInitialLoading(false);
     };
     checkInitial();
-  }, [user]);
+  }, [user, session]);
 
   // Load templates & customers
   useEffect(() => {
-    if (!user) return;
+    if (!user || !session?.access_token) return;
     const load = async () => {
       const [{ data: tplData }, { data: custData }] = await Promise.all([
         supabase.from("message_templates").select("*"),
@@ -78,7 +81,7 @@ const WhatsApp = () => {
       setCustomers(custData || []);
     };
     load();
-  }, [user]);
+  }, [user, session]);
 
   // Polling for connection status while QR is showing
   const stopPolling = useCallback(() => {
