@@ -72,7 +72,8 @@ serve(async (req) => {
 
       // If instance already exists, ignore error silently
       if (!res.ok && !JSON.stringify(data).toLowerCase().includes("already")) {
-        throw new Error(`Erro ao criar instância: ${JSON.stringify(data)}`);
+        console.error("[WHATSAPP] Instance create error:", JSON.stringify(data));
+        throw new Error("Falha ao criar instância WhatsApp");
       }
 
       // Upsert whatsapp_config
@@ -162,7 +163,8 @@ serve(async (req) => {
       logStep("Message sent", { status: res.status, phone: cleanPhone });
 
       if (!res.ok) {
-        throw new Error(`Evolution API erro: ${JSON.stringify(data)}`);
+        console.error("[WHATSAPP] Send message error:", JSON.stringify(data));
+        throw new Error("Falha ao enviar mensagem WhatsApp");
       }
 
       return new Response(JSON.stringify({ success: true, ...data }), {
