@@ -10,7 +10,7 @@ import { Users, TrendingUp, DollarSign, Activity, Shield, Settings, Edit2, Save 
 import { toast } from "sonner";
 
 const Admin = () => {
-  const [planPrices, setPlanPrices] = useState({ monthly: 110, semiannualDiscount: 12, annualDiscount: 22 });
+  const [planPrices, setPlanPrices] = useState({ monthly: 149, semiannualDiscount: 13, annualDiscount: 27 });
   const [landingContent, setLandingContent] = useState({
     headline: 'Seu pátio fica cheio e os clientes ficam perguntando no WhatsApp se o carro já está pronto?',
     subheadline: 'O Lavio avisa automaticamente o cliente quando o carro fica pronto, organiza seu caixa e mantém seus clientes voltando.',
