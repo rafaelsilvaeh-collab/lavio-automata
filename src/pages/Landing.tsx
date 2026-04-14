@@ -15,7 +15,7 @@ const Landing = () => {
       label: 'Mensal',
       price: 149,
       discount: null,
-      stripeLink: 'https://buy.stripe.com/cNi7sLfz20Q5fw22P12Ry09',
+      stripeLink: 'https://buy.stripe.com/7sY6oHdqU7etabIdtF2Ry0c',
       popular: false,
     },
     {
