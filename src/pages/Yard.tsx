@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,79 +8,194 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Clock, Car, MessageSquare, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Tables } from "@/integrations/supabase/types";
 
-type CarStatus = 'aguardando' | 'em_lavagem' | 'finalizado' | 'cliente_avisado' | 'entregue';
-
-interface YardCar {
-  id: string;
-  client: string;
-  plate: string;
-  service: string;
-  entryTime: string;
-  estimatedMinutes: number;
-  scheduledNotify: string;
-  status: CarStatus;
-}
+type CarStatus = "aguardando" | "em_lavagem" | "finalizado" | "cliente_avisado" | "entregue";
 
 const statusConfig: Record<CarStatus, { label: string; className: string }> = {
-  aguardando: { label: 'Aguardando', className: 'bg-warning/10 text-warning' },
-  em_lavagem: { label: 'Em lavagem', className: 'bg-primary/10 text-primary' },
-  finalizado: { label: 'Finalizado', className: 'bg-success/10 text-success' },
-  cliente_avisado: { label: 'Cliente avisado', className: 'bg-accent/10 text-accent' },
-  entregue: { label: 'Entregue', className: 'bg-muted text-muted-foreground' },
+  aguardando: { label: "Aguardando", className: "bg-warning/10 text-warning" },
+  em_lavagem: { label: "Em lavagem", className: "bg-primary/10 text-primary" },
+  finalizado: { label: "Finalizado", className: "bg-success/10 text-success" },
+  cliente_avisado: { label: "Cliente avisado", className: "bg-accent/10 text-accent" },
+  entregue: { label: "Entregue", className: "bg-muted text-muted-foreground" },
 };
 
-const statusOrder: CarStatus[] = ['aguardando', 'em_lavagem', 'finalizado', 'cliente_avisado', 'entregue'];
+const statusOrder: CarStatus[] = ["aguardando", "em_lavagem", "finalizado", "cliente_avisado", "entregue"];
 
-const mockCars: YardCar[] = [
-  { id: '1', client: 'João Silva', plate: 'ABC-1234', service: 'Lavagem completa', entryTime: '08:30', estimatedMinutes: 60, scheduledNotify: '09:30', status: 'em_lavagem' },
-  { id: '2', client: 'Maria Santos', plate: 'DEF-5678', service: 'Lavagem simples', entryTime: '09:00', estimatedMinutes: 30, scheduledNotify: '09:30', status: 'aguardando' },
-  { id: '3', client: 'Pedro Costa', plate: 'GHI-9012', service: 'Lavagem completa', entryTime: '07:45', estimatedMinutes: 60, scheduledNotify: '08:45', status: 'finalizado' },
-];
+interface YardCarFull {
+  id: string;
+  status: CarStatus;
+  entry_time: string;
+  estimated_duration: number | null;
+  scheduled_notification_time: string | null;
+  notes: string | null;
+  customer_id: string;
+  service_id: string | null;
+  customerName: string;
+  customerPlate: string | null;
+  serviceName: string | null;
+}
 
 const Yard = () => {
-  const [cars, setCars] = useState<YardCar[]>(mockCars);
+  const { user } = useAuth();
+  const [cars, setCars] = useState<YardCarFull[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editNotifyId, setEditNotifyId] = useState<string | null>(null);
-  const [newNotifyTime, setNewNotifyTime] = useState('');
+  const [newNotifyTime, setNewNotifyTime] = useState("");
 
-  const advanceStatus = (id: string) => {
-    setCars(prev => prev.map(car => {
-      if (car.id !== id) return car;
-      const idx = statusOrder.indexOf(car.status);
-      if (idx < statusOrder.length - 1) {
-        const next = statusOrder[idx + 1];
-        if (next === 'cliente_avisado') {
-          toast.success(`Mensagem enviada para ${car.client}!`);
-        }
-        return { ...car, status: next };
+  // Form state
+  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [selectedService, setSelectedService] = useState("");
+  const [estimatedMinutes, setEstimatedMinutes] = useState("40");
+  const [notifyTime, setNotifyTime] = useState("");
+
+  // Dropdown data
+  const [customers, setCustomers] = useState<Tables<"customers">[]>([]);
+  const [services, setServices] = useState<Tables<"services">[]>([]);
+
+  const fetchCars = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("cars_in_yard")
+      .select("*, customers(name, plate), services(name)")
+      .neq("status", "entregue")
+      .order("entry_time", { ascending: false });
+
+    if (error) {
+      console.error(error);
+    } else {
+      setCars((data || []).map((c: any) => ({
+        id: c.id,
+        status: c.status,
+        entry_time: c.entry_time,
+        estimated_duration: c.estimated_duration,
+        scheduled_notification_time: c.scheduled_notification_time,
+        notes: c.notes,
+        customer_id: c.customer_id,
+        service_id: c.service_id,
+        customerName: c.customers?.name || "Sem nome",
+        customerPlate: c.customers?.plate || null,
+        serviceName: c.services?.name || null,
+      })));
+    }
+    setLoading(false);
+  };
+
+  const fetchDropdowns = async () => {
+    if (!user) return;
+    const [{ data: c }, { data: s }] = await Promise.all([
+      supabase.from("customers").select("*").order("name"),
+      supabase.from("services").select("*").order("name"),
+    ]);
+    setCustomers(c || []);
+    setServices(s || []);
+  };
+
+  useEffect(() => {
+    fetchCars();
+    fetchDropdowns();
+  }, [user]);
+
+  const advanceStatus = async (id: string, currentStatus: CarStatus) => {
+    const idx = statusOrder.indexOf(currentStatus);
+    if (idx >= statusOrder.length - 1) return;
+    const next = statusOrder[idx + 1];
+
+    const { error } = await supabase
+      .from("cars_in_yard")
+      .update({ status: next })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Erro ao atualizar status");
+    } else {
+      if (next === "cliente_avisado") {
+        toast.success("Status atualizado! Cliente será avisado.");
+      } else {
+        toast.success("Status atualizado!");
       }
-      return car;
-    }));
+      fetchCars();
+    }
   };
 
-  const updateNotifyTime = (id: string) => {
-    setCars(prev => prev.map(car =>
-      car.id === id ? { ...car, scheduledNotify: newNotifyTime } : car
-    ));
-    setEditNotifyId(null);
-    toast.success('Horário do aviso atualizado!');
+  const updateNotifyTime = async (id: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    const { error } = await supabase
+      .from("cars_in_yard")
+      .update({ scheduled_notification_time: `${today}T${newNotifyTime}:00` })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Erro ao atualizar horário");
+    } else {
+      setEditNotifyId(null);
+      toast.success("Horário do aviso atualizado!");
+      fetchCars();
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Carro registrado com sucesso!');
-    setOpen(false);
+    if (!user || !selectedCustomer) {
+      toast.error("Selecione um cliente");
+      return;
+    }
+    setSaving(true);
+
+    const today = new Date().toISOString().split("T")[0];
+    const { error } = await supabase.from("cars_in_yard").insert({
+      user_id: user.id,
+      customer_id: selectedCustomer,
+      service_id: selectedService || null,
+      estimated_duration: parseInt(estimatedMinutes) || null,
+      scheduled_notification_time: notifyTime ? `${today}T${notifyTime}:00` : null,
+    });
+
+    if (error) {
+      toast.error("Erro ao registrar carro");
+      console.error(error);
+    } else {
+      toast.success("Carro registrado com sucesso!");
+      setOpen(false);
+      setSelectedCustomer("");
+      setSelectedService("");
+      setEstimatedMinutes("40");
+      setNotifyTime("");
+      fetchCars();
+    }
+    setSaving(false);
   };
 
-  const activeCars = cars.filter(c => c.status !== 'entregue');
+  const formatTime = (iso: string | null) => {
+    if (!iso) return "--:--";
+    try {
+      return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "--:--";
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div><Skeleton className="h-8 w-32" /><Skeleton className="h-4 w-48 mt-2" /></div>
+        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Pátio</h1>
-          <p className="text-muted-foreground text-sm">{activeCars.length} carros no pátio</p>
+          <p className="text-muted-foreground text-sm">{cars.length} carros no pátio</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -91,35 +206,40 @@ const Yard = () => {
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
                 <Label>Cliente</Label>
-                <Select><SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">João Silva - ABC-1234</SelectItem>
-                    <SelectItem value="2">Maria Santos - DEF-5678</SelectItem>
+                    {customers.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}{c.plate ? ` - ${c.plate}` : ""}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Serviço</Label>
-                <Select><SelectTrigger><SelectValue placeholder="Selecionar serviço" /></SelectTrigger>
+                <Select value={selectedService} onValueChange={setSelectedService}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar serviço" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="simples">Lavagem simples (R$40)</SelectItem>
-                    <SelectItem value="completa">Lavagem completa (R$80)</SelectItem>
-                    <SelectItem value="premium">Lavagem premium (R$120)</SelectItem>
+                    {services.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name} (R${Number(s.price)})</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Tempo estimado (min)</Label><Input type="number" defaultValue={40} /></div>
-                <div><Label>Horário do aviso</Label><Input type="time" /></div>
+                <div><Label>Tempo estimado (min)</Label><Input type="number" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} /></div>
+                <div><Label>Horário do aviso</Label><Input type="time" value={notifyTime} onChange={e => setNotifyTime(e.target.value)} /></div>
               </div>
-              <Button type="submit" className="w-full gradient-primary border-0">Registrar</Button>
+              <Button type="submit" className="w-full gradient-primary border-0" disabled={saving}>
+                {saving ? "Registrando..." : "Registrar"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid gap-3">
-        {activeCars.map((car) => {
+        {cars.map((car) => {
           const config = statusConfig[car.status];
           const nextIdx = statusOrder.indexOf(car.status) + 1;
           const nextStatus = nextIdx < statusOrder.length ? statusConfig[statusOrder[nextIdx]] : null;
@@ -130,24 +250,23 @@ const Yard = () => {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-foreground">{car.client}</h3>
+                      <h3 className="font-semibold text-foreground">{car.customerName}</h3>
                       <Badge className={`text-[10px] ${config.className} border-0`}>{config.label}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      <Car className="h-3 w-3 inline mr-1" />{car.plate} • {car.service}
+                      <Car className="h-3 w-3 inline mr-1" />{car.customerPlate || "Sem placa"} • {car.serviceName || "Sem serviço"}
                     </p>
                   </div>
                 </div>
 
-                {/* Status timeline */}
                 <div className="flex items-center gap-1 mb-3 overflow-x-auto">
                   {statusOrder.map((s, i) => {
                     const reached = statusOrder.indexOf(car.status) >= i;
                     return (
                       <div key={s} className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${reached ? 'bg-primary' : 'bg-border'}`} />
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${reached ? "bg-primary" : "bg-border"}`} />
                         {i < statusOrder.length - 1 && (
-                          <div className={`w-6 h-0.5 ${reached && statusOrder.indexOf(car.status) > i ? 'bg-primary' : 'bg-border'}`} />
+                          <div className={`w-6 h-0.5 ${reached && statusOrder.indexOf(car.status) > i ? "bg-primary" : "bg-border"}`} />
                         )}
                       </div>
                     );
@@ -155,19 +274,19 @@ const Yard = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-3">
-                  <span><Clock className="h-3 w-3 inline mr-1" />Entrada: {car.entryTime}</span>
+                  <span><Clock className="h-3 w-3 inline mr-1" />Entrada: {formatTime(car.entry_time)}</span>
                   <span>•</span>
-                  <span>{car.estimatedMinutes}min estimados</span>
+                  <span>{car.estimated_duration || "?"}min estimados</span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
                     <MessageSquare className="h-3 w-3" />
-                    Aviso: {car.scheduledNotify}
+                    Aviso: {formatTime(car.scheduled_notification_time)}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   {nextStatus && (
-                    <Button size="sm" className="gradient-primary border-0 text-xs" onClick={() => advanceStatus(car.id)}>
+                    <Button size="sm" className="gradient-primary border-0 text-xs" onClick={() => advanceStatus(car.id, car.status)}>
                       {nextStatus.label} <ChevronRight className="ml-1 h-3 w-3" />
                     </Button>
                   )}
@@ -178,7 +297,7 @@ const Yard = () => {
                       <Button size="sm" variant="ghost" className="text-xs h-8" onClick={() => setEditNotifyId(null)}>Cancelar</Button>
                     </div>
                   ) : (
-                    <Button size="sm" variant="outline" className="text-xs" onClick={() => { setEditNotifyId(car.id); setNewNotifyTime(car.scheduledNotify); }}>
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => { setEditNotifyId(car.id); setNewNotifyTime(""); }}>
                       Alterar horário do aviso
                     </Button>
                   )}
@@ -187,10 +306,10 @@ const Yard = () => {
             </Card>
           );
         })}
-        {activeCars.length === 0 && (
+        {cars.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <Car className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>Nenhum carro no pátio</p>
+            <p>Nenhum veículo no pátio. Os veículos aparecem aqui quando uma lavagem é registrada.</p>
           </div>
         )}
       </div>

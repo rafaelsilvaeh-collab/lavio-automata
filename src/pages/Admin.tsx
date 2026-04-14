@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, TrendingUp, DollarSign, Activity, Shield, Settings, Edit2, Save } from "lucide-react";
+import { Users, TrendingUp, DollarSign, Activity, Shield, Edit2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 const Admin = () => {
@@ -19,17 +18,11 @@ const Admin = () => {
   const [editingPlan, setEditingPlan] = useState(false);
   const [editingLanding, setEditingLanding] = useState(false);
 
-  const mockUsers = [
-    { id: '1', name: 'Lava Rápido do João', email: 'joao@email.com', plan: 'Lavgo', status: 'active', since: '2024-01-15' },
-    { id: '2', name: 'Auto Wash Maria', email: 'maria@email.com', plan: 'Trial', status: 'trial', since: '2024-03-01' },
-    { id: '3', name: 'Super Clean Pedro', email: 'pedro@email.com', plan: 'Lavgo', status: 'inactive', since: '2024-02-10' },
-  ];
-
   const metrics = [
-    { label: 'MRR', value: 'R$2.200', icon: DollarSign, color: 'text-success' },
-    { label: 'Clientes ativos', value: '20', icon: Users, color: 'text-primary' },
-    { label: 'Churn', value: '3%', icon: Activity, color: 'text-warning' },
-    { label: 'Trials ativos', value: '5', icon: TrendingUp, color: 'text-accent' },
+    { label: 'MRR', value: 'R$0', icon: DollarSign, color: 'text-success' },
+    { label: 'Clientes ativos', value: '0', icon: Users, color: 'text-primary' },
+    { label: 'Churn', value: '0%', icon: Activity, color: 'text-warning' },
+    { label: 'Trials ativos', value: '0', icon: TrendingUp, color: 'text-accent' },
   ];
 
   return (
@@ -42,7 +35,6 @@ const Admin = () => {
       <Tabs defaultValue="metrics">
         <TabsList className="flex-wrap">
           <TabsTrigger value="metrics">Métricas</TabsTrigger>
-          <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="plans">Planos</TabsTrigger>
           <TabsTrigger value="landing">Landing Page</TabsTrigger>
         </TabsList>
@@ -62,38 +54,8 @@ const Admin = () => {
           <Card>
             <CardHeader><CardTitle className="text-lg">Receita total</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-success">R$26.400</p>
-              <p className="text-sm text-muted-foreground">Receita acumulada desde o lançamento</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-lg">Clientes SaaS</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {mockUsers.map(user => (
-                  <div key={user.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                    <div>
-                      <p className="font-medium text-sm text-foreground">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email} • Desde {new Date(user.since).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={`text-[10px] ${
-                        user.status === 'active' ? 'bg-success/10 text-success border-success/20' :
-                        user.status === 'trial' ? 'bg-warning/10 text-warning border-warning/20' :
-                        'bg-destructive/10 text-destructive border-destructive/20'
-                      }`}>
-                        {user.status === 'active' ? 'Ativo' : user.status === 'trial' ? 'Trial' : 'Inativo'}
-                      </Badge>
-                      <Button size="sm" variant={user.status === 'inactive' ? 'default' : 'outline'} className="text-xs h-7">
-                        {user.status === 'inactive' ? 'Ativar' : 'Desativar'}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-3xl font-bold text-success">R$0</p>
+              <p className="text-sm text-muted-foreground">Dados disponíveis após integração com Stripe</p>
             </CardContent>
           </Card>
         </TabsContent>
