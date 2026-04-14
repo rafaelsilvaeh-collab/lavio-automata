@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Mail, Unlock } from "lucide-react";
+import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Unlock, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
