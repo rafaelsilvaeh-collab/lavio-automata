@@ -72,7 +72,8 @@ serve(async (req) => {
 
       // If instance already exists, ignore error silently
       if (!res.ok && !JSON.stringify(data).toLowerCase().includes("already")) {
-        throw new Error(`Erro ao criar instância: ${JSON.stringify(data)}`);
+        console.error("[WHATSAPP] Instance create error:", JSON.stringify(data));
+        throw new Error("Falha ao criar instância WhatsApp");
       }
 
       // Upsert whatsapp_config
