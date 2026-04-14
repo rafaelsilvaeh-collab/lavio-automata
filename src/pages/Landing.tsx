@@ -258,16 +258,21 @@ const Landing = () => {
               <Droplets className="h-6 w-6 text-primary" />
               <span className="text-lg font-bold text-primary-foreground">Lavgo</span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Mail className="h-4 w-4" />
-              <a href="mailto:suporte@lavgo.app" className="hover:text-primary-foreground transition-colors">
-                suporte@lavgo.app
-              </a>
-            </div>
             <p className="text-sm text-primary-foreground/50">© 2024 Lavgo. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
+      <a
+        href="https://wa.me/5515991473815?text=Olá! Preciso de ajuda com o Lavgo"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center justify-center shadow-lg transition-colors"
+        aria-label="Fale conosco no WhatsApp"
+      >
+        <MessageCircle className="h-7 w-7" />
+      </a>
     </div>
   );
 };
