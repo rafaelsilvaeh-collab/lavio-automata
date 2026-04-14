@@ -31,7 +31,7 @@ const Landing = () => {
       label: 'Anual',
       price: 109,
       discount: '27% OFF',
-      stripeLink: 'https://buy.stripe.com/dRm3cv3QkfKZ3Nk0GT2Ry0b',
+      stripeLink: 'https://buy.stripe.com/eVqdR9dqUgP3erYaht2Ry0e',
       popular: false,
     },
   ];
