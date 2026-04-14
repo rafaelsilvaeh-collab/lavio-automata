@@ -16,7 +16,7 @@ type MessageTemplate = Tables<"message_templates">;
 type Customer = Tables<"customers">;
 
 const WhatsApp = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   // Connection state
   const [connected, setConnected] = useState(false);
