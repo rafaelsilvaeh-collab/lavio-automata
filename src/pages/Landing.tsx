@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Mail, Unlock } from "lucide-react";
+import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Unlock, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
@@ -15,7 +15,7 @@ const Landing = () => {
       label: 'Mensal',
       price: 149,
       discount: null,
-      stripeLink: 'https://buy.stripe.com/cNi7sLfz20Q5fw22P12Ry09',
+      stripeLink: 'https://buy.stripe.com/7sY6oHdqU7etabIdtF2Ry0c',
       popular: false,
     },
     {
@@ -23,7 +23,7 @@ const Landing = () => {
       label: 'Semestral',
       price: 129,
       discount: '13% OFF',
-      stripeLink: 'https://buy.stripe.com/6oU6oHbiM7et0B8gFR2Ry0a',
+      stripeLink: 'https://buy.stripe.com/00w14ncmQ7etdnU2P12Ry0d',
       popular: true,
     },
     {
@@ -31,7 +31,7 @@ const Landing = () => {
       label: 'Anual',
       price: 109,
       discount: '27% OFF',
-      stripeLink: 'https://buy.stripe.com/dRm3cv3QkfKZ3Nk0GT2Ry0b',
+      stripeLink: 'https://buy.stripe.com/eVqdR9dqUgP3erYaht2Ry0e',
       popular: false,
     },
   ];
@@ -258,16 +258,21 @@ const Landing = () => {
               <Droplets className="h-6 w-6 text-primary" />
               <span className="text-lg font-bold text-primary-foreground">Lavgo</span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Mail className="h-4 w-4" />
-              <a href="mailto:suporte@lavgo.app" className="hover:text-primary-foreground transition-colors">
-                suporte@lavgo.app
-              </a>
-            </div>
             <p className="text-sm text-primary-foreground/50">© 2024 Lavgo. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
+      <a
+        href="https://wa.me/5515991473815?text=Olá! Preciso de ajuda com o Lavgo"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center justify-center shadow-lg transition-colors"
+        aria-label="Fale conosco no WhatsApp"
+      >
+        <MessageCircle className="h-7 w-7" />
+      </a>
     </div>
   );
 };
