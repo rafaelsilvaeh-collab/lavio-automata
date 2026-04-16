@@ -1,31 +1,51 @@
 
 
-# Cadastro de Serviços e Integração com Caixa
+# Ajustes na Navegação, Serviços e Pátio
 
 ## Contexto
-A tabela `services` já existe no banco com campos `name`, `price`, `duration_minutes` e `user_id` com RLS. O dropdown de serviços no Pátio já busca do banco, mas está vazio porque não há tela para cadastrar serviços. Além disso, ao registrar um carro com serviço, o valor não é lançado no caixa.
+A tabela `services` já existe e funciona. A página Services.tsx já tem CRUD. O Yard.tsx já integra com caixa. Precisa: reorganizar nav, adicionar atalhos rápidos + descrição nos serviços, tornar preço read-only no pátio, adicionar forma de pagamento, e mover WhatsApp para menu secundário.
+
+A tabela `services` não tem coluna `description` -- será necessária uma migração para adicioná-la.
+
+Não será criada `servicos_catalogo` -- a tabela `services` já cumpre o papel com RLS por `user_id`.
 
 ## Alterações
 
-### 1. Nova página de Serviços (`src/pages/Services.tsx`)
-- CRUD completo de serviços: nome, preço (R$), duração (minutos)
-- Lista dos serviços cadastrados em cards com opções de editar e excluir
-- Dialog para adicionar/editar serviço
-- Empty state: "Nenhum serviço cadastrado. Adicione seus tipos de lavagem para começar."
-- Queries filtradas por `user_id` (RLS já garante)
+### 1. Migração: adicionar `description` à tabela `services`
+```sql
+ALTER TABLE services ADD COLUMN description text;
+```
 
-### 2. Adicionar rota e navegação
-- `src/App.tsx`: nova rota `/services` com `AppLayout`
-- `src/components/AppSidebar.tsx`: item "Serviços" com ícone `Wrench` ou `Settings` entre "Clientes" e "Pátio"
-- `src/components/BottomNav.tsx`: substituir um item ou reorganizar para incluir "Serviços" (avaliar espaço no mobile)
+### 2. BottomNav -- reordenar, remover WhatsApp
+Ordem fixa: Home | Clientes | Pátio | Serviços | Caixa
 
-### 3. Integração Pátio → Caixa
-- Em `src/pages/Yard.tsx`, no `handleRegister`: quando um serviço é selecionado, buscar o preço do serviço e criar automaticamente um `cash_flow_entries` do tipo `entrada` com categoria igual ao nome do serviço, valor igual ao preço, e data de hoje.
+### 3. AppLayout -- header mobile com menu ···
+Adicionar header no mobile com "Lavgo" à esquerda e `MoreVertical` à direita. Menu dropdown com:
+- Conectar WhatsApp (navega para `/whatsapp`)
+- Configurações (placeholder)
+- Sair (`signOut()`)
+
+### 4. AppSidebar -- mover WhatsApp para seção "Mais"
+Remover WhatsApp de `mainItems`, colocar em seção secundária junto com Admin.
+
+### 5. Services.tsx -- atalhos rápidos + campo descrição
+- No empty state, exibir 4 botões de atalho:
+  - Simples R$80, Completa R$100, Polimento R$150, Higienização R$200
+- Clicar num atalho abre o dialog com nome e preço pré-preenchidos
+- Adicionar campo "Descrição (opcional)" ao formulário
+- Incluir `description` no payload de insert/update
+
+### 6. Yard.tsx -- preço read-only + forma de pagamento
+- Ao selecionar serviço, exibir campo "Preço (R$)" read-only com valor do catálogo
+- Adicionar "Forma de pagamento": PIX | Dinheiro | Cartão (botões toggle visuais)
+- No `handleRegister`, incluir forma de pagamento na descrição do lançamento no caixa
+- Toast: "Carro registrado e lançado no caixa ✅"
 
 ## Arquivos alterados
-- **Novo**: `src/pages/Services.tsx`
-- `src/App.tsx` — adicionar rota
-- `src/components/AppSidebar.tsx` — adicionar link de navegação
-- `src/components/BottomNav.tsx` — adicionar link de navegação
-- `src/pages/Yard.tsx` — ao registrar carro com serviço, inserir entrada no caixa
+- **Migração**: `ALTER TABLE services ADD COLUMN description text`
+- `src/components/BottomNav.tsx` -- reordenar itens
+- `src/components/AppLayout.tsx` -- header mobile com menu ···
+- `src/components/AppSidebar.tsx` -- mover WhatsApp
+- `src/pages/Services.tsx` -- atalhos + descrição
+- `src/pages/Yard.tsx` -- preço read-only + forma de pagamento
 
