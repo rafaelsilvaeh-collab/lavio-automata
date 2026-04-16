@@ -3,17 +3,34 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Tables } from "@/integrations/supabase/types";
+
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  duration_minutes: number;
+  description: string | null;
+  user_id: string;
+  created_at: string;
+}
+
+const quickServices = [
+  { name: "Simples", price: 80 },
+  { name: "Completa", price: 100 },
+  { name: "Polimento", price: 150 },
+  { name: "Higienização", price: 200 },
+];
 
 const Services = () => {
   const { user } = useAuth();
-  const [services, setServices] = useState<Tables<"services">[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -22,6 +39,7 @@ const Services = () => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [duration, setDuration] = useState("30");
+  const [description, setDescription] = useState("");
 
   const fetchServices = async () => {
     if (!user) return;
@@ -31,7 +49,7 @@ const Services = () => {
       .select("*")
       .order("name");
     if (error) console.error(error);
-    setServices(data || []);
+    setServices((data as Service[]) || []);
     setLoading(false);
   };
 
@@ -43,14 +61,23 @@ const Services = () => {
     setName("");
     setPrice("");
     setDuration("30");
+    setDescription("");
     setEditingId(null);
   };
 
-  const openEdit = (s: Tables<"services">) => {
+  const openEdit = (s: Service) => {
     setEditingId(s.id);
     setName(s.name);
     setPrice(String(s.price));
     setDuration(String(s.duration_minutes));
+    setDescription(s.description || "");
+    setOpen(true);
+  };
+
+  const openQuick = (q: { name: string; price: number }) => {
+    resetForm();
+    setName(q.name);
+    setPrice(String(q.price));
     setOpen(true);
   };
 
@@ -66,6 +93,7 @@ const Services = () => {
       name: name.trim(),
       price: parseFloat(price) || 0,
       duration_minutes: parseInt(duration) || 30,
+      description: description.trim() || null,
       user_id: user.id,
     };
 
@@ -141,6 +169,10 @@ const Services = () => {
                   <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} />
                 </div>
               </div>
+              <div>
+                <Label>Descrição (opcional)</Label>
+                <Textarea placeholder="Detalhes do serviço..." value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+              </div>
               <Button type="submit" className="w-full gradient-primary border-0" disabled={saving}>
                 {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar"}
               </Button>
@@ -158,6 +190,9 @@ const Services = () => {
                 <p className="text-sm text-muted-foreground">
                   R$ {Number(s.price).toFixed(2)} • {s.duration_minutes} min
                 </p>
+                {s.description && (
+                  <p className="text-xs text-muted-foreground mt-1">{s.description}</p>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button size="icon" variant="ghost" onClick={() => openEdit(s)}>
@@ -174,7 +209,14 @@ const Services = () => {
           <div className="text-center py-12 text-muted-foreground">
             <Wrench className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p>Nenhum serviço cadastrado.</p>
-            <p className="text-sm">Adicione seus tipos de lavagem para começar.</p>
+            <p className="text-sm mb-6">Adicione seus tipos de lavagem para começar.</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {quickServices.map((q) => (
+                <Button key={q.name} variant="outline" size="sm" onClick={() => openQuick(q)}>
+                  {q.name} — R${q.price}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
       </div>
