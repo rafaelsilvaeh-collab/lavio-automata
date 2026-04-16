@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Car, Wallet, MessageSquare, Settings, LogOut, Droplets, Shield,
+  LayoutDashboard, Users, Car, Wallet, MessageSquare, Settings, LogOut, Droplets, Shield, Wrench,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/customers", icon: Users },
+  { title: "Serviços", url: "/services", icon: Wrench },
   { title: "Pátio", url: "/yard", icon: Car },
   { title: "Caixa do Dia", url: "/cash-flow", icon: Wallet },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare },

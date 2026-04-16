@@ -13,6 +13,7 @@ import Customers from "./pages/Customers";
 import Yard from "./pages/Yard";
 import CashFlow from "./pages/CashFlow";
 import WhatsAppPage from "./pages/WhatsApp";
+import Services from "./pages/Services";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
             <Route path="/customers" element={<AppLayout><Customers /></AppLayout>} />
             <Route path="/yard" element={<AppLayout><Yard /></AppLayout>} />
+            <Route path="/services" element={<AppLayout><Services /></AppLayout>} />
             <Route path="/cash-flow" element={<AppLayout><CashFlow /></AppLayout>} />
             <Route path="/whatsapp" element={<AppLayout><WhatsAppPage /></AppLayout>} />
             <Route path="/admin" element={<AppLayout><Admin /></AppLayout>} />

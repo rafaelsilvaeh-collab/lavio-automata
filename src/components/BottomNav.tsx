@@ -1,12 +1,12 @@
-import { LayoutDashboard, Users, Car, Wallet, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, Car, Wallet, Wrench } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const items = [
   { title: "Home", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/customers", icon: Users },
+  { title: "Serviços", url: "/services", icon: Wrench },
   { title: "Pátio", url: "/yard", icon: Car },
   { title: "Caixa", url: "/cash-flow", icon: Wallet },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare },
 ];
 
 export const BottomNav = () => (
