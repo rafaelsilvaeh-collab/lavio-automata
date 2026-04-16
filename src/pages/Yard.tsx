@@ -161,6 +161,21 @@ const Yard = () => {
       toast.error("Erro ao registrar carro");
       console.error(error);
     } else {
+      // Auto-create cash flow entry if service selected
+      if (selectedService) {
+        const svc = services.find((s) => s.id === selectedService);
+        if (svc && Number(svc.price) > 0) {
+          const customer = customers.find((c) => c.id === selectedCustomer);
+          await supabase.from("cash_flow_entries").insert({
+            user_id: user.id,
+            type: "entrada" as const,
+            amount: Number(svc.price),
+            category: svc.name,
+            description: customer ? `${customer.name}${customer.plate ? ` - ${customer.plate}` : ""}` : undefined,
+            entry_date: today,
+          });
+        }
+      }
       toast.success("Carro registrado com sucesso!");
       setOpen(false);
       setSelectedCustomer("");
