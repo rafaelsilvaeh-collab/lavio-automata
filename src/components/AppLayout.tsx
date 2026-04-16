@@ -3,7 +3,11 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { BottomNav } from "@/components/BottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { MoreVertical, MessageSquare, Settings, LogOut } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Droplets } from "lucide-react";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,7 +15,8 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const isMobile = useIsMobile();
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -28,7 +33,35 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       <div className="min-h-screen flex w-full bg-background">
         {!isMobile && <AppSidebar />}
         <div className="flex-1 flex flex-col min-w-0">
-          {!isMobile && (
+          {isMobile ? (
+            <header className="h-14 flex items-center justify-between border-b px-4">
+              <div className="flex items-center gap-2">
+                <Droplets className="h-5 w-5 text-primary" />
+                <span className="font-bold text-foreground">Lavgo</span>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate("/whatsapp")}>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Conectar WhatsApp
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configurações
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={signOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </header>
+          ) : (
             <header className="h-14 flex items-center border-b px-4">
               <SidebarTrigger />
             </header>

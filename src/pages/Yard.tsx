@@ -25,6 +25,12 @@ const statusConfig: Record<CarStatus, { label: string; className: string }> = {
 
 const statusOrder: CarStatus[] = ["aguardando", "em_lavagem", "finalizado", "cliente_avisado", "entregue"];
 
+const paymentMethods = [
+  { value: "pix", label: "PIX" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "cartao", label: "Cartão" },
+];
+
 interface YardCarFull {
   id: string;
   status: CarStatus;
@@ -53,10 +59,15 @@ const Yard = () => {
   const [selectedService, setSelectedService] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState("40");
   const [notifyTime, setNotifyTime] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
 
   // Dropdown data
   const [customers, setCustomers] = useState<Tables<"customers">[]>([]);
   const [services, setServices] = useState<Tables<"services">[]>([]);
+
+  // Derived read-only price
+  const selectedServiceData = services.find((s) => s.id === selectedService);
+  const servicePrice = selectedServiceData ? Number(selectedServiceData.price) : null;
 
   const fetchCars = async () => {
     if (!user) return;
@@ -162,26 +173,30 @@ const Yard = () => {
       console.error(error);
     } else {
       // Auto-create cash flow entry if service selected
-      if (selectedService) {
-        const svc = services.find((s) => s.id === selectedService);
-        if (svc && Number(svc.price) > 0) {
-          const customer = customers.find((c) => c.id === selectedCustomer);
-          await supabase.from("cash_flow_entries").insert({
-            user_id: user.id,
-            type: "entrada" as const,
-            amount: Number(svc.price),
-            category: svc.name,
-            description: customer ? `${customer.name}${customer.plate ? ` - ${customer.plate}` : ""}` : undefined,
-            entry_date: today,
-          });
-        }
+      if (selectedService && selectedServiceData && servicePrice && servicePrice > 0) {
+        const customer = customers.find((c) => c.id === selectedCustomer);
+        const payLabel = paymentMethods.find((p) => p.value === paymentMethod)?.label;
+        const desc = [
+          customer ? `${customer.name}${customer.plate ? ` - ${customer.plate}` : ""}` : "",
+          payLabel ? `(${payLabel})` : "",
+        ].filter(Boolean).join(" ");
+
+        await supabase.from("cash_flow_entries").insert({
+          user_id: user.id,
+          type: "entrada" as const,
+          amount: servicePrice,
+          category: selectedServiceData.name,
+          description: desc || undefined,
+          entry_date: today,
+        });
       }
-      toast.success("Carro registrado com sucesso!");
+      toast.success("Carro registrado e lançado no caixa ✅");
       setOpen(false);
       setSelectedCustomer("");
       setSelectedService("");
       setEstimatedMinutes("40");
       setNotifyTime("");
+      setPaymentMethod("");
       fetchCars();
     }
     setSaving(false);
@@ -236,10 +251,39 @@ const Yard = () => {
                   <SelectTrigger><SelectValue placeholder="Selecionar serviço" /></SelectTrigger>
                   <SelectContent>
                     {services.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name} (R${Number(s.price)})</SelectItem>
+                      <SelectItem key={s.id} value={s.id}>{s.name} — R${Number(s.price).toFixed(2)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              {servicePrice !== null && (
+                <div>
+                  <Label>Preço (R$)</Label>
+                  <Input
+                    type="text"
+                    value={`R$ ${servicePrice.toFixed(2)}`}
+                    readOnly
+                    className="bg-muted cursor-not-allowed"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Para alterar o preço, edite em Serviços.</p>
+                </div>
+              )}
+              <div>
+                <Label>Forma de pagamento</Label>
+                <div className="flex gap-2 mt-1">
+                  {paymentMethods.map((m) => (
+                    <Button
+                      key={m.value}
+                      type="button"
+                      size="sm"
+                      variant={paymentMethod === m.value ? "default" : "outline"}
+                      className={paymentMethod === m.value ? "gradient-primary border-0" : ""}
+                      onClick={() => setPaymentMethod(m.value)}
+                    >
+                      {m.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Tempo estimado (min)</Label><Input type="number" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} /></div>

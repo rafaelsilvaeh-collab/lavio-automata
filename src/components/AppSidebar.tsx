@@ -1,8 +1,7 @@
 import {
-  LayoutDashboard, Users, Car, Wallet, MessageSquare, Settings, LogOut, Droplets, Shield, Wrench,
+  LayoutDashboard, Users, Car, Wallet, MessageSquare, LogOut, Droplets, Shield, Wrench,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -13,20 +12,19 @@ import { Button } from "@/components/ui/button";
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/customers", icon: Users },
-  { title: "Serviços", url: "/services", icon: Wrench },
   { title: "Pátio", url: "/yard", icon: Car },
+  { title: "Serviços", url: "/services", icon: Wrench },
   { title: "Caixa do Dia", url: "/cash-flow", icon: Wallet },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare },
 ];
 
-const adminItems = [
+const moreItems = [
+  { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare },
   { title: "Admin", url: "/admin", icon: Shield },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const { signOut } = useAuth();
 
   return (
@@ -56,10 +54,10 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+          <SidebarGroupLabel>Mais</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminItems.map((item) => (
+              {moreItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-primary/10 text-primary font-medium">
