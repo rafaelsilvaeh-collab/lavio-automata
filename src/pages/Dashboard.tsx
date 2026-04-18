@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Droplets, CheckCircle, DollarSign, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Car, Droplets, CheckCircle, DollarSign, Users, MessageSquare, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RegisterCarDialog } from "@/components/RegisterCarDialog";
 
 interface DashboardMetrics {
   noPatio: number;
