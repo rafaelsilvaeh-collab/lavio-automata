@@ -184,6 +184,7 @@ export type Database = {
           business_name: string | null
           created_at: string
           id: string
+          onboarding_completed: boolean
           phone: string | null
           updated_at: string
           user_id: string
@@ -192,6 +193,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           id?: string
+          onboarding_completed?: boolean
           phone?: string | null
           updated_at?: string
           user_id: string
@@ -200,6 +202,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           id?: string
+          onboarding_completed?: boolean
           phone?: string | null
           updated_at?: string
           user_id?: string
