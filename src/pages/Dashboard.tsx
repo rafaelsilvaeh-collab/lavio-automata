@@ -36,75 +36,79 @@ const Dashboard = () => {
   const [yardCars, setYardCars] = useState<YardCarDisplay[]>([]);
   const [daySummary, setDaySummary] = useState<DaySummaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [waConnected, setWaConnected] = useState<boolean | null>(null);
+
+  const fetchAll = async () => {
+    if (!user) return;
+    setLoading(true);
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data: cars } = await supabase
+      .from("cars_in_yard")
+      .select("id, status, entry_time, customer_id, service_id, customers(name, plate), services(name)")
+      .neq("status", "entregue");
+
+    const allCars = (cars || []) as any[];
+    const todayStart = new Date(today + "T00:00:00").toISOString();
+
+    const { count: atendidosCount } = await supabase
+      .from("cars_in_yard")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayStart);
+
+    const finalizadosHoje = allCars.filter(c => ["finalizado", "cliente_avisado"].includes(c.status)).length;
+
+    const { data: cashEntries } = await supabase
+      .from("cash_flow_entries")
+      .select("*")
+      .eq("entry_date", today);
+
+    const entries = cashEntries || [];
+    const faturamento = entries.filter(e => e.type === "entrada").reduce((s, e) => s + Number(e.amount), 0);
+
+    const summaryMap = new Map<string, DaySummaryEntry>();
+    entries.forEach(e => {
+      const key = `${e.type}-${e.category}`;
+      const existing = summaryMap.get(key);
+      if (existing) existing.total += Number(e.amount);
+      else summaryMap.set(key, { category: e.category, type: e.type, total: Number(e.amount) });
+    });
+
+    setMetrics({
+      noPatio: allCars.length,
+      emLavagem: allCars.filter(c => c.status === "em_lavagem").length,
+      finalizadosHoje,
+      faturamentoHoje: faturamento,
+      atendidosHoje: atendidosCount || 0,
+    });
+
+    setYardCars(allCars.map(c => ({
+      id: c.id,
+      clientName: c.customers?.name || "Sem nome",
+      plate: c.customers?.plate || null,
+      serviceName: c.services?.name || null,
+      status: c.status,
+    })));
+
+    setDaySummary(Array.from(summaryMap.values()));
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAll();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
-    const fetchAll = async () => {
-      setLoading(true);
-      const today = new Date().toISOString().split("T")[0];
-
-      // Fetch cars in yard (not entregue)
-      const { data: cars } = await supabase
-        .from("cars_in_yard")
-        .select("id, status, entry_time, customer_id, service_id, customers(name, plate), services(name)")
-        .neq("status", "entregue");
-
-      const allCars = (cars || []) as any[];
-      const todayStart = new Date(today + "T00:00:00").toISOString();
-
-      // Fetch today's cars for "atendidos hoje"
-      const { count: atendidosCount } = await supabase
-        .from("cars_in_yard")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", todayStart);
-
-      // Fetch today's finalizados
-      const finalizadosHoje = allCars.filter(c => {
-        const isFinished = ["finalizado", "cliente_avisado"].includes(c.status);
-        return isFinished;
-      }).length;
-
-      // Fetch cash flow entries for today
-      const { data: cashEntries } = await supabase
-        .from("cash_flow_entries")
-        .select("*")
-        .eq("entry_date", today);
-
-      const entries = cashEntries || [];
-      const faturamento = entries.filter(e => e.type === "entrada").reduce((s, e) => s + Number(e.amount), 0);
-
-      // Group by category for day summary
-      const summaryMap = new Map<string, DaySummaryEntry>();
-      entries.forEach(e => {
-        const key = `${e.type}-${e.category}`;
-        const existing = summaryMap.get(key);
-        if (existing) {
-          existing.total += Number(e.amount);
-        } else {
-          summaryMap.set(key, { category: e.category, type: e.type, total: Number(e.amount) });
-        }
-      });
-
-      setMetrics({
-        noPatio: allCars.length,
-        emLavagem: allCars.filter(c => c.status === "em_lavagem").length,
-        finalizadosHoje,
-        faturamentoHoje: faturamento,
-        atendidosHoje: atendidosCount || 0,
-      });
-
-      setYardCars(allCars.map(c => ({
-        id: c.id,
-        clientName: c.customers?.name || "Sem nome",
-        plate: c.customers?.plate || null,
-        serviceName: c.services?.name || null,
-        status: c.status,
-      })));
-
-      setDaySummary(Array.from(summaryMap.values()));
-      setLoading(false);
-    };
-    fetchAll();
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke("whatsapp", { body: { action: "check-status" } });
+        setWaConnected(data?.conectado === true);
+      } catch {
+        setWaConnected(false);
+      }
+    })();
   }, [user]);
 
   const stats = [
