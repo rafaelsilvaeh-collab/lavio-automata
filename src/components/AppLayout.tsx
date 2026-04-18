@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { BottomNav } from "@/components/BottomNav";
@@ -8,6 +9,8 @@ import { MoreVertical, MessageSquare, Settings, LogOut } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Droplets } from "lucide-react";
+import { OnboardingModal } from "@/components/OnboardingModal";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -17,6 +20,23 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const isMobile = useIsMobile();
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cancelled && data && data.onboarding_completed === false) {
+        setShowOnboarding(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   if (loading) {
     return (
@@ -72,6 +92,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           {isMobile && <BottomNav />}
         </div>
       </div>
+      <OnboardingModal open={showOnboarding} onComplete={() => setShowOnboarding(false)} />
     </SidebarProvider>
   );
 };

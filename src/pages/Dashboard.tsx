@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Droplets, CheckCircle, DollarSign, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Car, Droplets, CheckCircle, DollarSign, Users, MessageSquare, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RegisterCarDialog } from "@/components/RegisterCarDialog";
 
 interface DashboardMetrics {
   noPatio: number;
@@ -33,75 +36,79 @@ const Dashboard = () => {
   const [yardCars, setYardCars] = useState<YardCarDisplay[]>([]);
   const [daySummary, setDaySummary] = useState<DaySummaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [waConnected, setWaConnected] = useState<boolean | null>(null);
+
+  const fetchAll = async () => {
+    if (!user) return;
+    setLoading(true);
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data: cars } = await supabase
+      .from("cars_in_yard")
+      .select("id, status, entry_time, customer_id, service_id, customers(name, plate), services(name)")
+      .neq("status", "entregue");
+
+    const allCars = (cars || []) as any[];
+    const todayStart = new Date(today + "T00:00:00").toISOString();
+
+    const { count: atendidosCount } = await supabase
+      .from("cars_in_yard")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayStart);
+
+    const finalizadosHoje = allCars.filter(c => ["finalizado", "cliente_avisado"].includes(c.status)).length;
+
+    const { data: cashEntries } = await supabase
+      .from("cash_flow_entries")
+      .select("*")
+      .eq("entry_date", today);
+
+    const entries = cashEntries || [];
+    const faturamento = entries.filter(e => e.type === "entrada").reduce((s, e) => s + Number(e.amount), 0);
+
+    const summaryMap = new Map<string, DaySummaryEntry>();
+    entries.forEach(e => {
+      const key = `${e.type}-${e.category}`;
+      const existing = summaryMap.get(key);
+      if (existing) existing.total += Number(e.amount);
+      else summaryMap.set(key, { category: e.category, type: e.type, total: Number(e.amount) });
+    });
+
+    setMetrics({
+      noPatio: allCars.length,
+      emLavagem: allCars.filter(c => c.status === "em_lavagem").length,
+      finalizadosHoje,
+      faturamentoHoje: faturamento,
+      atendidosHoje: atendidosCount || 0,
+    });
+
+    setYardCars(allCars.map(c => ({
+      id: c.id,
+      clientName: c.customers?.name || "Sem nome",
+      plate: c.customers?.plate || null,
+      serviceName: c.services?.name || null,
+      status: c.status,
+    })));
+
+    setDaySummary(Array.from(summaryMap.values()));
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAll();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
-    const fetchAll = async () => {
-      setLoading(true);
-      const today = new Date().toISOString().split("T")[0];
-
-      // Fetch cars in yard (not entregue)
-      const { data: cars } = await supabase
-        .from("cars_in_yard")
-        .select("id, status, entry_time, customer_id, service_id, customers(name, plate), services(name)")
-        .neq("status", "entregue");
-
-      const allCars = (cars || []) as any[];
-      const todayStart = new Date(today + "T00:00:00").toISOString();
-
-      // Fetch today's cars for "atendidos hoje"
-      const { count: atendidosCount } = await supabase
-        .from("cars_in_yard")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", todayStart);
-
-      // Fetch today's finalizados
-      const finalizadosHoje = allCars.filter(c => {
-        const isFinished = ["finalizado", "cliente_avisado"].includes(c.status);
-        return isFinished;
-      }).length;
-
-      // Fetch cash flow entries for today
-      const { data: cashEntries } = await supabase
-        .from("cash_flow_entries")
-        .select("*")
-        .eq("entry_date", today);
-
-      const entries = cashEntries || [];
-      const faturamento = entries.filter(e => e.type === "entrada").reduce((s, e) => s + Number(e.amount), 0);
-
-      // Group by category for day summary
-      const summaryMap = new Map<string, DaySummaryEntry>();
-      entries.forEach(e => {
-        const key = `${e.type}-${e.category}`;
-        const existing = summaryMap.get(key);
-        if (existing) {
-          existing.total += Number(e.amount);
-        } else {
-          summaryMap.set(key, { category: e.category, type: e.type, total: Number(e.amount) });
-        }
-      });
-
-      setMetrics({
-        noPatio: allCars.length,
-        emLavagem: allCars.filter(c => c.status === "em_lavagem").length,
-        finalizadosHoje,
-        faturamentoHoje: faturamento,
-        atendidosHoje: atendidosCount || 0,
-      });
-
-      setYardCars(allCars.map(c => ({
-        id: c.id,
-        clientName: c.customers?.name || "Sem nome",
-        plate: c.customers?.plate || null,
-        serviceName: c.services?.name || null,
-        status: c.status,
-      })));
-
-      setDaySummary(Array.from(summaryMap.values()));
-      setLoading(false);
-    };
-    fetchAll();
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke("whatsapp", { body: { action: "check-status" } });
+        setWaConnected(data?.conectado === true);
+      } catch {
+        setWaConnected(false);
+      }
+    })();
   }, [user]);
 
   const stats = [
@@ -157,6 +164,33 @@ const Dashboard = () => {
           </Card>
         ))}
       </div>
+
+      {waConnected !== null && (
+        waConnected ? (
+          <div className="bg-[#f0fdf4] text-[#15803d] rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
+            <MessageSquare className="h-4 w-4" />
+            <span>💬 WhatsApp ativo — mensagens automáticas</span>
+          </div>
+        ) : (
+          <div className="bg-[#fef9c3] text-[#854d0e] rounded-lg px-3 py-2 flex items-center justify-between gap-2 text-sm">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              ⚠️ WhatsApp desconectado
+            </span>
+            <Link to="/whatsapp" className="font-semibold underline">Conectar agora →</Link>
+          </div>
+        )
+      )}
+
+      <Button
+        onClick={() => setRegisterOpen(true)}
+        className="w-full h-16 bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold text-lg rounded-2xl shadow-[0_4px_14px_rgba(14,165,233,0.4)] flex flex-col gap-0 py-2 border-0"
+      >
+        <span>🚗 + Registrar novo carro</span>
+        <span className="text-xs font-normal opacity-90">Toque aqui para iniciar</span>
+      </Button>
+
+      <RegisterCarDialog open={registerOpen} onOpenChange={setRegisterOpen} onSuccess={fetchAll} />
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>

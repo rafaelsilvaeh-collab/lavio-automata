@@ -2,34 +2,34 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Clock, Car, MessageSquare, ChevronRight } from "lucide-react";
+import { Plus, Clock, Car, MessageSquare, ChevronRight, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Tables } from "@/integrations/supabase/types";
+import { RegisterCarDialog } from "@/components/RegisterCarDialog";
 
 type CarStatus = "aguardando" | "em_lavagem" | "finalizado" | "cliente_avisado" | "entregue";
 
-const statusConfig: Record<CarStatus, { label: string; className: string }> = {
-  aguardando: { label: "Aguardando", className: "bg-warning/10 text-warning" },
-  em_lavagem: { label: "Em lavagem", className: "bg-primary/10 text-primary" },
-  finalizado: { label: "Finalizado", className: "bg-success/10 text-success" },
-  cliente_avisado: { label: "Cliente avisado", className: "bg-accent/10 text-accent" },
-  entregue: { label: "Entregue", className: "bg-muted text-muted-foreground" },
+// Simplified visual statuses (3 states)
+type SimpleStatus = "chegou" | "lavando" | "pronto";
+
+const toSimple = (s: CarStatus): SimpleStatus => {
+  if (s === "aguardando") return "chegou";
+  if (s === "em_lavagem") return "lavando";
+  return "pronto"; // finalizado | cliente_avisado
 };
 
-const statusOrder: CarStatus[] = ["aguardando", "em_lavagem", "finalizado", "cliente_avisado", "entregue"];
+const simpleConfig: Record<SimpleStatus, { label: string; emoji: string; className: string; dot: string }> = {
+  chegou:  { label: "Chegou",            emoji: "🟡", className: "bg-[#fef9c3] text-[#854d0e]", dot: "bg-[#f59e0b]" },
+  lavando: { label: "Lavando",           emoji: "🔵", className: "bg-[#dbeafe] text-[#1e40af]", dot: "bg-[#3b82f6]" },
+  pronto:  { label: "Pronto pra retirar", emoji: "✅", className: "bg-[#dcfce7] text-[#15803d]", dot: "bg-[#22c55e]" },
+};
 
-const paymentMethods = [
-  { value: "pix", label: "PIX" },
-  { value: "dinheiro", label: "Dinheiro" },
-  { value: "cartao", label: "Cartão" },
-];
+const simpleOrder: SimpleStatus[] = ["chegou", "lavando", "pronto"];
 
 interface YardCarFull {
   id: string;
@@ -48,26 +48,11 @@ interface YardCarFull {
 const Yard = () => {
   const { user } = useAuth();
   const [cars, setCars] = useState<YardCarFull[]>([]);
+  const [services, setServices] = useState<Tables<"services">[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [editNotifyId, setEditNotifyId] = useState<string | null>(null);
   const [newNotifyTime, setNewNotifyTime] = useState("");
-
-  // Form state
-  const [selectedCustomer, setSelectedCustomer] = useState("");
-  const [selectedService, setSelectedService] = useState("");
-  const [estimatedMinutes, setEstimatedMinutes] = useState("40");
-  const [notifyTime, setNotifyTime] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-
-  // Dropdown data
-  const [customers, setCustomers] = useState<Tables<"customers">[]>([]);
-  const [services, setServices] = useState<Tables<"services">[]>([]);
-
-  // Derived read-only price
-  const selectedServiceData = services.find((s) => s.id === selectedService);
-  const servicePrice = selectedServiceData ? Number(selectedServiceData.price) : null;
 
   const fetchCars = async () => {
     if (!user) return;
@@ -98,41 +83,40 @@ const Yard = () => {
     setLoading(false);
   };
 
-  const fetchDropdowns = async () => {
+  const fetchServices = async () => {
     if (!user) return;
-    const [{ data: c }, { data: s }] = await Promise.all([
-      supabase.from("customers").select("*").order("name"),
-      supabase.from("services").select("*").order("name"),
-    ]);
-    setCustomers(c || []);
-    setServices(s || []);
+    const { data } = await supabase.from("services").select("*").order("name");
+    setServices(data || []);
   };
 
   useEffect(() => {
     fetchCars();
-    fetchDropdowns();
+    fetchServices();
   }, [user]);
 
-  const advanceStatus = async (id: string, currentStatus: CarStatus) => {
-    const idx = statusOrder.indexOf(currentStatus);
-    if (idx >= statusOrder.length - 1) return;
-    const next = statusOrder[idx + 1];
+  // Move a car to next simple state by updating db status
+  const advance = async (id: string, current: CarStatus) => {
+    let next: CarStatus | null = null;
+    if (current === "aguardando") next = "em_lavagem";
+    else if (current === "em_lavagem") next = "cliente_avisado";
+    else if (current === "finalizado" || current === "cliente_avisado") next = "entregue";
+    if (!next) return;
 
-    const { error } = await supabase
-      .from("cars_in_yard")
-      .update({ status: next })
-      .eq("id", id);
-
+    const { error } = await supabase.from("cars_in_yard").update({ status: next }).eq("id", id);
     if (error) {
       toast.error("Erro ao atualizar status");
     } else {
-      if (next === "cliente_avisado") {
-        toast.success("Status atualizado! Cliente será avisado.");
-      } else {
-        toast.success("Status atualizado!");
-      }
+      if (next === "cliente_avisado") toast.success("Carro pronto! Cliente será avisado.");
+      else if (next === "em_lavagem") toast.success("Lavagem iniciada!");
+      else if (next === "entregue") toast.success("Carro entregue! ✅");
       fetchCars();
     }
+  };
+
+  const advanceLabel = (current: CarStatus) => {
+    if (current === "aguardando") return "▶ Iniciou lavagem";
+    if (current === "em_lavagem") return "✅ Carro pronto";
+    return "Entregar e finalizar";
   };
 
   const updateNotifyTime = async (id: string) => {
@@ -141,74 +125,14 @@ const Yard = () => {
       .from("cars_in_yard")
       .update({ scheduled_notification_time: `${today}T${newNotifyTime}:00` })
       .eq("id", id);
-
-    if (error) {
-      toast.error("Erro ao atualizar horário");
-    } else {
-      setEditNotifyId(null);
-      toast.success("Horário do aviso atualizado!");
-      fetchCars();
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !selectedCustomer) {
-      toast.error("Selecione um cliente");
-      return;
-    }
-    setSaving(true);
-
-    const today = new Date().toISOString().split("T")[0];
-    const { error } = await supabase.from("cars_in_yard").insert({
-      user_id: user.id,
-      customer_id: selectedCustomer,
-      service_id: selectedService || null,
-      estimated_duration: parseInt(estimatedMinutes) || null,
-      scheduled_notification_time: notifyTime ? `${today}T${notifyTime}:00` : null,
-    });
-
-    if (error) {
-      toast.error("Erro ao registrar carro");
-      console.error(error);
-    } else {
-      // Auto-create cash flow entry if service selected
-      if (selectedService && selectedServiceData && servicePrice && servicePrice > 0) {
-        const customer = customers.find((c) => c.id === selectedCustomer);
-        const payLabel = paymentMethods.find((p) => p.value === paymentMethod)?.label;
-        const desc = [
-          customer ? `${customer.name}${customer.plate ? ` - ${customer.plate}` : ""}` : "",
-          payLabel ? `(${payLabel})` : "",
-        ].filter(Boolean).join(" ");
-
-        await supabase.from("cash_flow_entries").insert({
-          user_id: user.id,
-          type: "entrada" as const,
-          amount: servicePrice,
-          category: selectedServiceData.name,
-          description: desc || undefined,
-          entry_date: today,
-        });
-      }
-      toast.success("Carro registrado e lançado no caixa ✅");
-      setOpen(false);
-      setSelectedCustomer("");
-      setSelectedService("");
-      setEstimatedMinutes("40");
-      setNotifyTime("");
-      setPaymentMethod("");
-      fetchCars();
-    }
-    setSaving(false);
+    if (error) toast.error("Erro ao atualizar horário");
+    else { setEditNotifyId(null); toast.success("Horário do aviso atualizado!"); fetchCars(); }
   };
 
   const formatTime = (iso: string | null) => {
     if (!iso) return "--:--";
-    try {
-      return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "--:--";
-    }
+    try { return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+    catch { return "--:--"; }
   };
 
   if (loading) {
@@ -220,88 +144,35 @@ const Yard = () => {
     );
   }
 
+  const noServices = services.length === 0;
+
   return (
     <div className="space-y-6">
+      {noServices && (
+        <div className="bg-[#fef9c3] border-l-4 border-[#eab308] text-[#854d0e] rounded-lg p-3 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium">Configure seus serviços antes de registrar um carro.</p>
+            <Link to="/services" className="underline font-semibold inline-block mt-1">Ir para Serviços →</Link>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Pátio</h1>
           <p className="text-muted-foreground text-sm">{cars.length} carros no pátio</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary border-0"><Plus className="mr-2 h-4 w-4" /> Registrar carro</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Registrar carro</DialogTitle></DialogHeader>
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <Label>Cliente</Label>
-                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}{c.plate ? ` - ${c.plate}` : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Serviço</Label>
-                <Select value={selectedService} onValueChange={setSelectedService}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar serviço" /></SelectTrigger>
-                  <SelectContent>
-                    {services.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name} — R${Number(s.price).toFixed(2)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {servicePrice !== null && (
-                <div>
-                  <Label>Preço (R$)</Label>
-                  <Input
-                    type="text"
-                    value={`R$ ${servicePrice.toFixed(2)}`}
-                    readOnly
-                    className="bg-muted cursor-not-allowed"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1">Para alterar o preço, edite em Serviços.</p>
-                </div>
-              )}
-              <div>
-                <Label>Forma de pagamento</Label>
-                <div className="flex gap-2 mt-1">
-                  {paymentMethods.map((m) => (
-                    <Button
-                      key={m.value}
-                      type="button"
-                      size="sm"
-                      variant={paymentMethod === m.value ? "default" : "outline"}
-                      className={paymentMethod === m.value ? "gradient-primary border-0" : ""}
-                      onClick={() => setPaymentMethod(m.value)}
-                    >
-                      {m.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Tempo estimado (min)</Label><Input type="number" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} /></div>
-                <div><Label>Horário do aviso</Label><Input type="time" value={notifyTime} onChange={e => setNotifyTime(e.target.value)} /></div>
-              </div>
-              <Button type="submit" className="w-full gradient-primary border-0" disabled={saving}>
-                {saving ? "Registrando..." : "Registrar"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button className="gradient-primary border-0" onClick={() => setOpen(true)} disabled={noServices}>
+          <Plus className="mr-2 h-4 w-4" /> Registrar carro
+        </Button>
+        <RegisterCarDialog open={open} onOpenChange={setOpen} onSuccess={fetchCars} />
       </div>
 
       <div className="grid gap-3">
         {cars.map((car) => {
-          const config = statusConfig[car.status];
-          const nextIdx = statusOrder.indexOf(car.status) + 1;
-          const nextStatus = nextIdx < statusOrder.length ? statusConfig[statusOrder[nextIdx]] : null;
+          const simple = toSimple(car.status);
+          const config = simpleConfig[simple];
 
           return (
             <Card key={car.id} className="border-border/50">
@@ -310,7 +181,7 @@ const Yard = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-foreground">{car.customerName}</h3>
-                      <Badge className={`text-[10px] ${config.className} border-0`}>{config.label}</Badge>
+                      <Badge className={`text-[10px] ${config.className} border-0`}>{config.emoji} {config.label}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       <Car className="h-3 w-3 inline mr-1" />{car.customerPlate || "Sem placa"} • {car.serviceName || "Sem serviço"}
@@ -318,14 +189,14 @@ const Yard = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 mb-3 overflow-x-auto">
-                  {statusOrder.map((s, i) => {
-                    const reached = statusOrder.indexOf(car.status) >= i;
+                <div className="flex items-center gap-1 mb-3">
+                  {simpleOrder.map((s, i) => {
+                    const reached = simpleOrder.indexOf(simple) >= i;
                     return (
                       <div key={s} className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${reached ? "bg-primary" : "bg-border"}`} />
-                        {i < statusOrder.length - 1 && (
-                          <div className={`w-6 h-0.5 ${reached && statusOrder.indexOf(car.status) > i ? "bg-primary" : "bg-border"}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${reached ? simpleConfig[s].dot : "bg-border"}`} />
+                        {i < simpleOrder.length - 1 && (
+                          <div className={`w-8 h-0.5 ${simpleOrder.indexOf(simple) > i ? "bg-primary" : "bg-border"}`} />
                         )}
                       </div>
                     );
@@ -344,11 +215,9 @@ const Yard = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {nextStatus && (
-                    <Button size="sm" className="gradient-primary border-0 text-xs" onClick={() => advanceStatus(car.id, car.status)}>
-                      {nextStatus.label} <ChevronRight className="ml-1 h-3 w-3" />
-                    </Button>
-                  )}
+                  <Button size="sm" className="gradient-primary border-0 text-xs" onClick={() => advance(car.id, car.status)}>
+                    {advanceLabel(car.status)} <ChevronRight className="ml-1 h-3 w-3" />
+                  </Button>
                   {editNotifyId === car.id ? (
                     <div className="flex gap-2 items-center">
                       <Input type="time" className="h-8 w-28 text-xs" value={newNotifyTime} onChange={e => setNewNotifyTime(e.target.value)} />
