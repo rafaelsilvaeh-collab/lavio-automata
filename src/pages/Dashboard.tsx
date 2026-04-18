@@ -165,6 +165,33 @@ const Dashboard = () => {
         ))}
       </div>
 
+      {waConnected !== null && (
+        waConnected ? (
+          <div className="bg-[#f0fdf4] text-[#15803d] rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
+            <MessageSquare className="h-4 w-4" />
+            <span>💬 WhatsApp ativo — mensagens automáticas</span>
+          </div>
+        ) : (
+          <div className="bg-[#fef9c3] text-[#854d0e] rounded-lg px-3 py-2 flex items-center justify-between gap-2 text-sm">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              ⚠️ WhatsApp desconectado
+            </span>
+            <Link to="/whatsapp" className="font-semibold underline">Conectar agora →</Link>
+          </div>
+        )
+      )}
+
+      <Button
+        onClick={() => setRegisterOpen(true)}
+        className="w-full h-16 bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold text-lg rounded-2xl shadow-[0_4px_14px_rgba(14,165,233,0.4)] flex flex-col gap-0 py-2 border-0"
+      >
+        <span>🚗 + Registrar novo carro</span>
+        <span className="text-xs font-normal opacity-90">Toque aqui para iniciar</span>
+      </Button>
+
+      <RegisterCarDialog open={registerOpen} onOpenChange={setRegisterOpen} onSuccess={fetchAll} />
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-lg">Carros no pátio</CardTitle></CardHeader>
