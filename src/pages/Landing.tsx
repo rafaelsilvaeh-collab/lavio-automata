@@ -1,9 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Play, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Unlock, MessageCircle } from "lucide-react";
+import { Check, Droplets, Bell, BarChart3, Clock, Users, TrendingUp, Unlock, MessageCircle, Car, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+
+const SOCIAL_PROOF = {
+  customers: '+50',
+  rating: '4.9/5',
+};
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -64,28 +69,56 @@ const Landing = () => {
       </header>
 
       {/* Hero */}
-      <section className="gradient-hero pt-32 pb-20 md:pt-40 md:pb-32 text-primary-foreground">
+      <section className="gradient-hero pt-24 pb-10 md:pt-40 md:pb-32 text-primary-foreground">
         <div className="container mx-auto px-4 text-center max-w-4xl">
-          <Badge className="mb-6 bg-primary/20 text-primary-foreground border-primary/30 hover:bg-primary/20">
-            7 dias grátis • Sem cartão de crédito
-          </Badge>
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-            Seu pátio fica cheio e os clientes ficam perguntando no WhatsApp se o carro já está pronto?
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-5">
+            Seu cliente fica ligando perguntando se o carro tá pronto?
           </h1>
-          <p className="text-lg md:text-xl text-primary-foreground/70 mb-4 max-w-2xl mx-auto">
-            O problema não é falta de organização. <strong className="text-primary-foreground">É falta de automação no atendimento.</strong>
+          <p className="text-base md:text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
+            O <strong>Lavgo</strong> avisa automaticamente pelo WhatsApp. Sem você digitar nada.
           </p>
-          <p className="text-lg md:text-xl text-primary-foreground/80 mb-10 max-w-2xl mx-auto">
-            O <strong>Lavgo</strong> avisa automaticamente o cliente quando o carro fica pronto, organiza seu caixa e mantém seus clientes voltando.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={() => navigate('/auth?tab=signup')} className="gradient-primary border-0 text-lg px-8 py-6 rounded-xl shadow-lg">
-              Comece a usar agora
+          <div className="max-w-md mx-auto">
+            <Button
+              size="lg"
+              onClick={() => navigate('/auth?tab=signup')}
+              className="w-full text-lg px-8 py-6 rounded-xl shadow-lg border-0 bg-[hsl(var(--cta-orange))] hover:bg-[hsl(var(--cta-orange-hover))] text-white"
+            >
+              Testar grátis por 7 dias
             </Button>
-            <Button size="lg" className="text-lg px-8 py-6 rounded-xl bg-primary/30 hover:bg-primary/50 text-primary-foreground border border-primary/40" onClick={() => document.getElementById('screenshots')?.scrollIntoView({ behavior: 'smooth' })}>
-              <Play className="mr-2 h-5 w-5" /> Ver como funciona
-            </Button>
+            <p className="text-sm text-primary-foreground/70 mt-3">
+              Sem cartão de crédito. Cancele quando quiser.
+            </p>
           </div>
+        </div>
+      </section>
+
+      {/* Social Proof Bar */}
+      <section className="bg-white border-y border-[#e2e8f0] py-6">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm md:text-base text-slate-700 mb-5">
+            <div className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-[hsl(var(--brand-blue-accent))]" />
+              <span className="font-extrabold text-[hsl(var(--brand-blue-accent))]">{SOCIAL_PROOF.customers}</span>
+              <span>lava-rápidos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-[hsl(var(--brand-blue-accent))] fill-current" />
+              <span className="font-extrabold text-[hsl(var(--brand-blue-accent))]">{SOCIAL_PROOF.rating}</span>
+              <span>avaliação</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-[hsl(var(--brand-blue-accent))]" />
+              <span>WhatsApp nativo</span>
+            </div>
+          </div>
+          <Card className="max-w-2xl mx-auto border-[#e2e8f0]">
+            <CardContent className="p-5 text-center">
+              <p className="text-slate-700 italic mb-2">
+                "Antes eu ficava respondendo WhatsApp o dia todo. Agora o sistema avisa e eu foco na lavagem."
+              </p>
+              <p className="text-sm text-slate-500">— Primeiro usuário do Lavgo</p>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -106,7 +139,7 @@ const Landing = () => {
                   <div className="gradient-primary w-12 h-12 rounded-xl flex items-center justify-center mb-4">
                     <item.icon className="h-6 w-6 text-primary-foreground" />
                   </div>
-                  <div className="text-3xl font-bold text-gradient mb-1">{item.stat}</div>
+                  <div className="text-3xl font-extrabold text-[hsl(var(--brand-blue-accent))] mb-1">{item.stat}</div>
                   <div className="text-sm text-muted-foreground mb-3">{item.statLabel}</div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{item.title}</h3>
                   <p className="text-muted-foreground text-sm">{item.description}</p>
@@ -167,7 +200,10 @@ const Landing = () => {
       <section className="py-16 md:py-24 bg-secondary/50">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Plano simples, sem surpresas</h2>
-          <p className="text-muted-foreground mb-8">Comece com 7 dias grátis. Cancele quando quiser.</p>
+          <p className="text-muted-foreground mb-4">Comece com 7 dias grátis. Cancele quando quiser.</p>
+          <p className="text-sm text-[#64748b] text-center mb-6 max-w-xl mx-auto">
+            R$149/mês é menos do que o valor de 2 lavagens completas perdidas por semana por falta de comunicação.
+          </p>
 
           {/* Toggle */}
           <div className="flex justify-center gap-2 mb-10">
@@ -225,8 +261,11 @@ const Landing = () => {
                       ))}
                     </ul>
                     <Button
-                      className={`w-full ${isSelected ? 'gradient-primary border-0' : ''}`}
-                      variant={isSelected ? 'default' : 'outline'}
+                      className={`w-full ${
+                        plan.popular
+                          ? 'gradient-primary border-0'
+                          : 'bg-[hsl(var(--brand-blue-dark))] hover:bg-[hsl(var(--brand-blue-darker))] text-white border-0'
+                      }`}
                       onClick={() => window.open(plan.stripeLink, '_blank')}
                     >
                       Começar grátis
@@ -245,6 +284,25 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Final CTA */}
+      <section className="gradient-hero py-16 md:py-24 text-primary-foreground">
+        <div className="container mx-auto px-4 text-center max-w-2xl">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            Comece hoje. Seus clientes agradecem amanhã.
+          </h2>
+          <p className="text-base md:text-lg text-primary-foreground/80 mb-8">
+            7 dias grátis. Sem burocracia. Cancele quando quiser.
+          </p>
+          <Button
+            size="lg"
+            onClick={() => navigate('/auth?tab=signup')}
+            className="text-lg px-8 py-6 rounded-xl shadow-lg border-0 bg-[hsl(var(--cta-orange))] hover:bg-[hsl(var(--cta-orange-hover))] text-white"
+          >
+            Criar minha conta grátis →
+          </Button>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-12 bg-foreground text-primary-foreground/80">
         <div className="container mx-auto px-4">
@@ -260,7 +318,7 @@ const Landing = () => {
 
       {/* Floating WhatsApp Button */}
       <a
-        href="https://wa.me/5515991473815?text=Olá! Preciso de ajuda com o Lavgo"
+        href="https://wa.me/5515991364980?text=Olá! Vi o Lavgo e tenho interesse em testar"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center justify-center shadow-lg transition-colors"

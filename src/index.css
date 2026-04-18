@@ -49,6 +49,12 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+
+    --cta-orange: 24 95% 53%;
+    --cta-orange-hover: 20 90% 48%;
+    --brand-blue-dark: 224 76% 33%;
+    --brand-blue-darker: 224 64% 27%;
+    --brand-blue-accent: 224 76% 40%;
   }
 
   .dark {
