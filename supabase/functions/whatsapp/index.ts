@@ -12,16 +12,43 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[WHATSAPP] ${step}${d}`);
 };
 
+const maskNumber = (n: string) => {
+  if (!n) return "";
+  if (n.length <= 4) return "***";
+  return `${n.slice(0, 4)}***${n.slice(-2)}`;
+};
+
 function getEvolutionConfig() {
   const url = Deno.env.get("EVOLUTION_API_URL");
   const key = Deno.env.get("EVOLUTION_API_KEY");
-  if (!url) throw new Error("EVOLUTION_API_URL não configurada");
-  if (!key) throw new Error("EVOLUTION_API_KEY não configurada");
+  if (!url || url.trim() === "") {
+    const e = new Error("EVOLUTION_API_URL não configurada");
+    (e as any).code = "WA_NOT_CONFIGURED";
+    (e as any).status = 503;
+    throw e;
+  }
+  if (!key || key.trim() === "") {
+    const e = new Error("EVOLUTION_API_KEY não configurada");
+    (e as any).code = "WA_NOT_CONFIGURED";
+    (e as any).status = 503;
+    throw e;
+  }
   return { url: url.replace(/\/$/, ""), key };
 }
 
 function buildInstanceName(userId: string): string {
   return `lavgo_${userId.replace(/-/g, "").slice(0, 16)}`;
+}
+
+async function checkInstanceState(url: string, key: string, instanceName: string): Promise<string> {
+  const res = await fetch(`${url}/instance/connectionState/${instanceName}`, {
+    method: "GET",
+    headers: { apikey: key },
+  });
+  const data = await res.json().catch(() => ({}));
+  const state = data?.instance?.state || data?.state || "close";
+  logStep(`[WA] action=check-state URL=${url} STATE=${state} STATUS=${res.status}`);
+  return state;
 }
 
 serve(async (req) => {
@@ -36,7 +63,6 @@ serve(async (req) => {
   );
 
   try {
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autenticado" }), {
@@ -57,13 +83,13 @@ serve(async (req) => {
 
     const userId = userData.user.id;
     const instanceName = buildInstanceName(userId);
-    logStep("User authenticated", { userId, instanceName });
+    logStep(`[WA] user=${userId} instance=${instanceName}`);
 
     const body = await req.json();
     const { action } = body;
     if (!action) throw new Error("Ação não especificada");
 
-    logStep("Action requested", { action });
+    logStep(`[WA] action=${action}`);
 
     if (action === "create-instance") {
       const { url, key } = getEvolutionConfig();
@@ -79,15 +105,13 @@ serve(async (req) => {
       });
 
       const data = await res.json();
-      logStep("Instance create response", { status: res.status });
+      logStep(`[WA] action=create-instance URL=${url} STATUS=${res.status}`);
 
-      // If instance already exists, ignore error silently
       if (!res.ok && !JSON.stringify(data).toLowerCase().includes("already")) {
         console.error("[WHATSAPP] Instance create error:", JSON.stringify(data));
         throw new Error("Falha ao criar instância WhatsApp");
       }
 
-      // Upsert whatsapp_config
       const { data: existing } = await supabase
         .from("whatsapp_config")
         .select("id")
@@ -119,7 +143,7 @@ serve(async (req) => {
       });
 
       const data = await res.json();
-      logStep("QR code fetched", { status: res.status });
+      logStep(`[WA] action=get-qrcode URL=${url} STATUS=${res.status}`);
 
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -128,19 +152,9 @@ serve(async (req) => {
 
     if (action === "check-status") {
       const { url, key } = getEvolutionConfig();
-
-      const res = await fetch(`${url}/instance/connectionState/${instanceName}`, {
-        method: "GET",
-        headers: { apikey: key },
-      });
-
-      const data = await res.json();
-      logStep("Status checked", { status: res.status, data });
-
-      const state = data?.instance?.state || data?.state || "close";
+      const state = await checkInstanceState(url, key, instanceName);
       const isConnected = state === "open";
 
-      // Update connection status in DB
       await supabase
         .from("whatsapp_config")
         .update({
@@ -161,7 +175,22 @@ serve(async (req) => {
 
       const { url, key } = getEvolutionConfig();
 
-      let cleanPhone = phone.replace(/\D/g, "");
+      // Pre-flight: connection state
+      const state = await checkInstanceState(url, key, instanceName);
+      if (state !== "open") {
+        logStep(`[WA] action=send-message BLOCKED STATE=${state}`);
+        return new Response(
+          JSON.stringify({
+            error: "WhatsApp desconectado. Reconecte em Configurações.",
+            code: "WA_DISCONNECTED",
+            state,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+        );
+      }
+
+      // Normalize phone: only digits, prepend 55 if missing
+      let cleanPhone = String(phone).replace(/\D/g, "");
       if (cleanPhone.length <= 11) cleanPhone = `55${cleanPhone}`;
 
       const res = await fetch(`${url}/message/sendText/${instanceName}`, {
@@ -170,12 +199,15 @@ serve(async (req) => {
         body: JSON.stringify({ number: cleanPhone, textMessage: { text: message } }),
       });
 
-      const data = await res.json();
-      logStep("Message sent", { status: res.status, phone: cleanPhone });
+      const data = await res.json().catch(() => ({}));
+      logStep(`[WA] action=send-message URL=${url} STATE=${state} NUMBER=${maskNumber(cleanPhone)} STATUS=${res.status}`);
 
       if (!res.ok) {
         console.error("[WHATSAPP] Send message error:", JSON.stringify(data));
-        throw new Error("Falha ao enviar mensagem WhatsApp");
+        return new Response(
+          JSON.stringify({ error: "Falha ao enviar mensagem WhatsApp", details: data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 502 }
+        );
       }
 
       return new Response(JSON.stringify({ success: true, ...data }), {
@@ -198,7 +230,7 @@ serve(async (req) => {
         .update({ is_connected: false, updated_at: new Date().toISOString() })
         .eq("user_id", userId);
 
-      logStep("Disconnected");
+      logStep(`[WA] action=disconnect URL=${url} STATUS=${res.status}`);
       return new Response(JSON.stringify({ success: true, ...data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -207,10 +239,12 @@ serve(async (req) => {
     throw new Error(`Ação desconhecida: ${action}`);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: msg });
-    return new Response(JSON.stringify({ error: msg }), {
+    const code = (error as any)?.code;
+    const status = (error as any)?.status || 400;
+    logStep(`[WA] ERROR code=${code || "ERR"} STATUS=${status}`, { message: msg });
+    return new Response(JSON.stringify({ error: msg, code }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status,
     });
   }
 });

@@ -3,9 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, TrendingUp, TrendingDown, DollarSign, ArrowUpCircle, ArrowDownCircle, Wallet } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Plus, TrendingUp, TrendingDown, DollarSign, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,14 +36,26 @@ const CashFlow = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Modo treino
+  const [trainingMode, setTrainingMode] = useState(false);
+
   // Initial balance state
   const [showInitialBalance, setShowInitialBalance] = useState(false);
   const [initialBalanceChecked, setInitialBalanceChecked] = useState(false);
   const [initialBalanceValue, setInitialBalanceValue] = useState("");
 
-  // Form state
   const [incomeForm, setIncomeForm] = useState({ category: "", description: "", amount: "" });
   const [expenseForm, setExpenseForm] = useState({ category: "", description: "", amount: "" });
+
+  useEffect(() => {
+    setTrainingMode(localStorage.getItem("modoTreino") === "true");
+  }, []);
+
+  const toggleTrainingMode = (v: boolean) => {
+    setTrainingMode(v);
+    localStorage.setItem("modoTreino", String(v));
+    toast.success(v ? "🎓 Modo treino ativado" : "Modo treino desativado");
+  };
 
   const fetchEntries = async () => {
     if (!user) return;
@@ -50,30 +75,30 @@ const CashFlow = () => {
     setLoading(false);
   };
 
-  // Check if user has ANY entries (for initial balance card)
   const checkInitialBalance = async () => {
     if (!user) return;
     const { count } = await supabase
       .from("cash_flow_entries")
-      .select("id", { count: "exact", head: true });
+      .select("id", { count: "exact", head: true })
+      .eq("is_test", false);
 
     setShowInitialBalance(count === 0);
     setInitialBalanceChecked(true);
   };
 
   useEffect(() => {
-    if (user) {
-      checkInitialBalance();
-    }
+    if (user) checkInitialBalance();
   }, [user]);
 
   useEffect(() => {
     fetchEntries();
   }, [user, date]);
 
-  const totalIncome = entries.filter(e => e.type === "entrada").reduce((sum, e) => sum + Number(e.amount), 0);
-  const totalExpense = entries.filter(e => e.type === "saida").reduce((sum, e) => sum + Number(e.amount), 0);
+  const realEntries = entries.filter((e) => !e.is_test);
+  const totalIncome = realEntries.filter(e => e.type === "entrada").reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalExpense = realEntries.filter(e => e.type === "saida").reduce((sum, e) => sum + Number(e.amount), 0);
   const result = totalIncome - totalExpense;
+  const testCount = entries.filter((e) => e.is_test).length;
 
   const handleSaveEntry = async (type: "entrada" | "saida") => {
     if (!user) return;
@@ -87,13 +112,14 @@ const CashFlow = () => {
       description: form.description || null,
       amount: parseFloat(form.amount) || 0,
       entry_date: date,
+      is_test: trainingMode,
     });
 
     if (error) {
       toast.error("Erro ao salvar movimentação");
       console.error(error);
     } else {
-      toast.success(`${type === "entrada" ? "Entrada" : "Saída"} registrada!`);
+      toast.success(`${type === "entrada" ? "Entrada" : "Saída"} registrada${trainingMode ? " (TESTE)" : ""}!`);
       if (type === "entrada") {
         setOpenIncome(false);
         setIncomeForm({ category: "", description: "", amount: "" });
@@ -102,7 +128,7 @@ const CashFlow = () => {
         setExpenseForm({ category: "", description: "", amount: "" });
       }
       fetchEntries();
-      setShowInitialBalance(false);
+      if (!trainingMode) setShowInitialBalance(false);
     }
     setSaving(false);
   };
@@ -122,6 +148,7 @@ const CashFlow = () => {
       description: "Saldo inicial definido pelo usuário",
       amount: val,
       entry_date: new Date().toISOString().split("T")[0],
+      is_test: false,
     });
     if (error) {
       toast.error("Erro ao definir saldo inicial");
@@ -131,6 +158,20 @@ const CashFlow = () => {
       fetchEntries();
     }
     setSaving(false);
+  };
+
+  const handleClearTestData = async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("cash_flow_entries")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("is_test", true);
+    if (error) toast.error("Erro ao limpar registros de teste");
+    else {
+      toast.success("Registros de teste removidos");
+      fetchEntries();
+    }
   };
 
   return (
@@ -143,7 +184,45 @@ const CashFlow = () => {
         <Input type="date" className="w-auto" value={date} onChange={e => setDate(e.target.value)} />
       </div>
 
-      {/* Initial balance card */}
+      {/* Training mode toggle */}
+      <Card className={trainingMode ? "border-warning/50 bg-warning/5" : "border-border/50"}>
+        <CardContent className="p-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <GraduationCap className={`h-5 w-5 ${trainingMode ? "text-warning" : "text-muted-foreground"}`} />
+            <div>
+              <p className="text-sm font-medium">Modo treino</p>
+              <p className="text-[11px] text-muted-foreground">
+                Lançamentos marcados como TESTE — não entram no total real.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {testCount > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="text-xs">
+                    <Trash2 className="h-3 w-3 mr-1" /> Limpar teste ({testCount})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Limpar registros de teste?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Todos os lançamentos marcados como TESTE serão removidos. Lançamentos reais permanecem.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearTestData}>Limpar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <Switch checked={trainingMode} onCheckedChange={toggleTrainingMode} />
+          </div>
+        </CardContent>
+      </Card>
+
       {initialBalanceChecked && showInitialBalance && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-5">
@@ -181,7 +260,6 @@ const CashFlow = () => {
         </Card>
       )}
 
-      {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="border-border/50">
           <CardContent className="p-4 text-center">
@@ -206,7 +284,6 @@ const CashFlow = () => {
         </Card>
       </div>
 
-      {/* Action buttons */}
       <div className="flex gap-3">
         <Dialog open={openIncome} onOpenChange={setOpenIncome}>
           <DialogTrigger asChild>
@@ -215,7 +292,7 @@ const CashFlow = () => {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Nova entrada</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Nova entrada {trainingMode && <Badge variant="outline" className="ml-2">TESTE</Badge>}</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); handleSaveEntry("entrada"); }} className="space-y-4">
               <div>
                 <Label>Categoria</Label>
@@ -244,7 +321,7 @@ const CashFlow = () => {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Nova saída</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Nova saída {trainingMode && <Badge variant="outline" className="ml-2">TESTE</Badge>}</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); handleSaveEntry("saida"); }} className="space-y-4">
               <div>
                 <Label>Categoria</Label>
@@ -267,7 +344,6 @@ const CashFlow = () => {
         </Dialog>
       </div>
 
-      {/* Entries list */}
       <Card>
         <CardHeader><CardTitle className="text-lg">Movimentações</CardTitle></CardHeader>
         <CardContent>
@@ -283,19 +359,31 @@ const CashFlow = () => {
           ) : (
             <div className="space-y-2">
               {entries.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                <div
+                  key={entry.id}
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    entry.is_test ? "bg-muted/40 opacity-70" : "bg-secondary/50"
+                  }`}
+                >
                   <div className="flex items-center gap-3">
                     {entry.type === "entrada" ? (
-                      <TrendingUp className="h-4 w-4 text-success" />
+                      <TrendingUp className={`h-4 w-4 ${entry.is_test ? "text-muted-foreground" : "text-success"}`} />
                     ) : (
-                      <TrendingDown className="h-4 w-4 text-destructive" />
+                      <TrendingDown className={`h-4 w-4 ${entry.is_test ? "text-muted-foreground" : "text-destructive"}`} />
                     )}
                     <div>
-                      <p className="text-sm font-medium text-foreground">{entry.category}</p>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium ${entry.is_test ? "text-muted-foreground" : "text-foreground"}`}>{entry.category}</p>
+                        {entry.is_test && <Badge variant="outline" className="text-[9px] h-4 border-warning text-warning">TESTE</Badge>}
+                      </div>
                       <p className="text-xs text-muted-foreground">{entry.description || "Sem descrição"} • {new Date(entry.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
                     </div>
                   </div>
-                  <span className={`font-semibold text-sm ${entry.type === "entrada" ? "text-success" : "text-destructive"}`}>
+                  <span className={`font-semibold text-sm ${
+                    entry.is_test
+                      ? "text-muted-foreground"
+                      : entry.type === "entrada" ? "text-success" : "text-destructive"
+                  }`}>
                     {entry.type === "entrada" ? "+" : "-"}R${Number(entry.amount)}
                   </span>
                 </div>

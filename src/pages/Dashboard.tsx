@@ -62,7 +62,8 @@ const Dashboard = () => {
     const { data: cashEntries } = await supabase
       .from("cash_flow_entries")
       .select("*")
-      .eq("entry_date", today);
+      .eq("entry_date", today)
+      .eq("is_test", false);
 
     const entries = cashEntries || [];
     const faturamento = entries.filter(e => e.type === "entrada").reduce((s, e) => s + Number(e.amount), 0);
