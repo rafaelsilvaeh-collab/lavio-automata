@@ -225,14 +225,14 @@ const Yard = () => {
       <RegisterCarDialog
         open={open}
         onOpenChange={(v) => { setOpen(v); if (!v) setEditId(null); }}
-        onSuccess={fetchCars}
+        onSuccess={() => { fetchCars(); fetchServices(); }}
         editId={editId}
       />
       <FinalizeCarDialog
         carId={finalizeId}
         open={!!finalizeId}
         onOpenChange={(v) => { if (!v) setFinalizeId(null); }}
-        onSuccess={fetchCars}
+        onSuccess={() => { fetchCars(); fetchServices(); }}
       />
 
       <div className="grid gap-3">
