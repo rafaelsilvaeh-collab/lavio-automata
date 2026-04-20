@@ -8,12 +8,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Phone, Car, User, X, Clock, History } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Search, Phone, Car, User, X, History, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Tables } from "@/integrations/supabase/types";
-import { formatPhoneInput, toStorage } from "@/lib/phone";
+import { formatPhoneInput, fromStorage, toStorage } from "@/lib/phone";
 
 type Customer = Tables<"customers">;
 
@@ -32,16 +42,15 @@ const Customers = () => {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Detail panel
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerHistory, setCustomerHistory] = useState<ServiceHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Form state
   const [form, setForm] = useState({ name: "", phone: "", car_model: "", plate: "", notes: "" });
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
@@ -77,45 +86,99 @@ const Customers = () => {
     );
   }, [customers, debouncedSearch]);
 
+  const resetForm = () => {
+    setForm({ name: "", phone: "", car_model: "", plate: "", notes: "" });
+    setEditingId(null);
+  };
+
+  const openNew = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const openEdit = (c: Customer, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(c.id);
+    setForm({
+      name: c.name,
+      phone: fromStorage(c.phone),
+      car_model: c.car_model || "",
+      plate: c.plate || "",
+      notes: c.notes || "",
+    });
+    setOpen(true);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("customers").insert({
-      user_id: user.id,
+    const payload = {
       name: form.name,
       phone: form.phone ? toStorage(form.phone) : null,
       car_model: form.car_model || null,
       plate: form.plate || null,
       notes: form.notes || null,
-    });
+    };
+    const { error } = editingId
+      ? await supabase.from("customers").update(payload).eq("id", editingId)
+      : await supabase.from("customers").insert({ ...payload, user_id: user.id });
+
     if (error) {
-      toast.error("Erro ao salvar cliente");
+      toast.error(editingId ? "Erro ao atualizar cliente" : "Erro ao salvar cliente");
       console.error(error);
     } else {
-      toast.success("Cliente salvo com sucesso!");
-      setForm({ name: "", phone: "", car_model: "", plate: "", notes: "" });
+      toast.success(editingId ? "Cliente atualizado!" : "Cliente salvo com sucesso!");
+      resetForm();
       setOpen(false);
       fetchCustomers();
     }
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    if (!user || !deleteId) return;
+    const customer = customers.find((c) => c.id === deleteId);
+    if (!customer) return;
+
+    // Guard: check history in cash_flow_entries by name match
+    const { count } = await supabase
+      .from("cash_flow_entries")
+      .select("id", { count: "exact", head: true })
+      .ilike("description", `%${customer.name}%`);
+
+    if ((count ?? 0) > 0) {
+      toast.error("Cliente possui histórico e não pode ser excluído.");
+      setDeleteId(null);
+      return;
+    }
+
+    // Delete active yard records first
+    await supabase.from("cars_in_yard").delete().eq("customer_id", deleteId);
+    const { error } = await supabase.from("customers").delete().eq("id", deleteId);
+    if (error) {
+      toast.error("Erro ao excluir cliente");
+    } else {
+      toast.success("Cliente excluído");
+      fetchCustomers();
+    }
+    setDeleteId(null);
+  };
+
   const openCustomerDetail = async (customer: Customer) => {
     setSelectedCustomer(customer);
     setHistoryLoading(true);
 
-    // Fetch last 10 services for this customer via cars_in_yard
     const { data } = await supabase
       .from("cars_in_yard")
-      .select("id, status, created_at, services(name)")
+      .select("id, status, created_at, services(name), ad_hoc_service_name")
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false })
       .limit(10);
 
     setCustomerHistory((data || []).map((d: any) => ({
       id: d.id,
-      serviceName: d.services?.name || "Serviço não especificado",
+      serviceName: d.services?.name || d.ad_hoc_service_name || "Serviço não especificado",
       date: d.created_at,
       status: d.status,
     })));
@@ -137,21 +200,23 @@ const Customers = () => {
           <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground text-sm">{customers.length} clientes cadastrados</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="gradient-primary border-0"><Plus className="mr-2 h-4 w-4" /> Novo cliente</Button>
+            <Button className="gradient-primary border-0" onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Novo cliente</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Novo cliente</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar cliente" : "Novo cliente"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSave} className="space-y-4">
               <div><Label>Nome</Label><Input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
               <div><Label>WhatsApp</Label><Input placeholder="(15) 99999-9999" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: formatPhoneInput(e.target.value) }))} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Modelo do carro</Label><Input placeholder="Ex: Civic 2022" value={form.car_model} onChange={e => setForm(f => ({ ...f, car_model: e.target.value }))} /></div>
-                <div><Label>Placa</Label><Input placeholder="ABC-1234" value={form.plate} onChange={e => setForm(f => ({ ...f, plate: e.target.value }))} /></div>
+                <div><Label>Placa</Label><Input placeholder="ABC-1234" value={form.plate} onChange={e => setForm(f => ({ ...f, plate: e.target.value.toUpperCase() }))} /></div>
               </div>
               <div><Label>Observações</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
-              <Button type="submit" className="w-full gradient-primary border-0" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+              <Button type="submit" className="w-full gradient-primary border-0" disabled={saving}>
+                {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -197,19 +262,19 @@ const Customers = () => {
                 onClick={() => openCustomerDetail(customer)}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className="gradient-primary w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
                         <User className="h-5 w-5 text-primary-foreground" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-foreground">{customer.name}</h3>
                           {customer.is_recurring && <Badge variant="secondary" className="text-[10px]">Recorrente</Badge>}
                           {!customer.is_active && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          {customer.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{customer.phone}</span>}
+                          {customer.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{fromStorage(customer.phone)}</span>}
                           {(customer.car_model || customer.plate) && (
                             <span className="flex items-center gap-1">
                               <Car className="h-3 w-3" />
@@ -219,9 +284,22 @@ const Customers = () => {
                         </div>
                       </div>
                     </div>
-                    <Badge className={`text-[10px] ${returnStatus.color} border-0`}>
-                      {returnStatus.emoji} {returnStatus.label}
-                    </Badge>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Badge className={`text-[10px] ${returnStatus.color} border-0`}>
+                        {returnStatus.emoji} {returnStatus.label}
+                      </Badge>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => openEdit(customer, e)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); setDeleteId(customer.id); }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -235,7 +313,24 @@ const Customers = () => {
         )}
       </div>
 
-      {/* Customer detail sheet */}
+      <AlertDialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir este cliente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Clientes com histórico de serviços finalizados não podem ser excluídos.
+              Registros ativos no pátio serão removidos junto.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Sheet open={!!selectedCustomer} onOpenChange={(open) => { if (!open) setSelectedCustomer(null); }}>
         <SheetContent className="overflow-y-auto">
           {selectedCustomer && (
@@ -247,15 +342,13 @@ const Customers = () => {
                 </SheetTitle>
               </SheetHeader>
 
-              {/* Contact */}
               {selectedCustomer.phone && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="h-4 w-4" />
-                  {selectedCustomer.phone}
+                  {fromStorage(selectedCustomer.phone)}
                 </div>
               )}
 
-              {/* Vehicle */}
               {(selectedCustomer.car_model || selectedCustomer.plate) && (
                 <div>
                   <h4 className="text-sm font-semibold text-foreground mb-1">🚗 Veículo cadastrado</h4>
@@ -267,7 +360,6 @@ const Customers = () => {
                 </div>
               )}
 
-              {/* Return status */}
               {(() => {
                 const rs = getReturnStatus(selectedCustomer.last_wash_date);
                 return (
@@ -278,7 +370,6 @@ const Customers = () => {
                 );
               })()}
 
-              {/* Last service */}
               {customerHistory.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-foreground mb-2">📋 Último serviço</h4>
@@ -290,7 +381,6 @@ const Customers = () => {
                 </div>
               )}
 
-              {/* History */}
               <div>
                 <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1">
                   <History className="h-4 w-4" /> Histórico completo
@@ -316,7 +406,6 @@ const Customers = () => {
                 )}
               </div>
 
-              {/* Notes */}
               {selectedCustomer.notes && (
                 <div>
                   <h4 className="text-sm font-semibold text-foreground mb-1">Observações</h4>
