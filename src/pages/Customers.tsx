@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Tables } from "@/integrations/supabase/types";
+import { formatPhoneInput, toStorage } from "@/lib/phone";
 
 type Customer = Tables<"customers">;
 
@@ -83,7 +84,7 @@ const Customers = () => {
     const { error } = await supabase.from("customers").insert({
       user_id: user.id,
       name: form.name,
-      phone: form.phone || null,
+      phone: form.phone ? toStorage(form.phone) : null,
       car_model: form.car_model || null,
       plate: form.plate || null,
       notes: form.notes || null,
@@ -144,7 +145,7 @@ const Customers = () => {
             <DialogHeader><DialogTitle>Novo cliente</DialogTitle></DialogHeader>
             <form onSubmit={handleSave} className="space-y-4">
               <div><Label>Nome</Label><Input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-              <div><Label>Telefone</Label><Input placeholder="(11) 99999-9999" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+              <div><Label>WhatsApp</Label><Input placeholder="(15) 99999-9999" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: formatPhoneInput(e.target.value) }))} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Modelo do carro</Label><Input placeholder="Ex: Civic 2022" value={form.car_model} onChange={e => setForm(f => ({ ...f, car_model: e.target.value }))} /></div>
                 <div><Label>Placa</Label><Input placeholder="ABC-1234" value={form.plate} onChange={e => setForm(f => ({ ...f, plate: e.target.value }))} /></div>

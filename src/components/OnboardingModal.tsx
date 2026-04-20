@@ -7,6 +7,7 @@ import { Loader2, QrCode, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatPhoneInput, toStorage } from "@/lib/phone";
 
 interface OnboardingModalProps {
   open: boolean;
@@ -26,14 +27,6 @@ const DEFAULT_SERVICES: ServiceOption[] = [
   { emoji: "💎", name: "Polimento", price: 150, selected: false },
   { emoji: "🧴", name: "Higienização", price: 200, selected: false },
 ];
-
-const formatPhoneBR = (raw: string) => {
-  const d = raw.replace(/\D/g, "").slice(0, 13);
-  if (d.length <= 2) return d;
-  if (d.length <= 4) return `${d.slice(0, 2)} (${d.slice(2)}`;
-  if (d.length <= 9) return `${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4)}`;
-  return `${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9)}`;
-};
 
 const formatPlate = (raw: string) => {
   const v = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
@@ -133,7 +126,7 @@ export const OnboardingModal = ({ open, onComplete }: OnboardingModalProps) => {
     const { error } = await supabase.from("customers").insert({
       user_id: user.id,
       name: custName.trim(),
-      phone: custPhone.replace(/\D/g, ""),
+      phone: toStorage(custPhone),
       plate: custPlate,
       car_model: custModel.trim() || null,
     });
@@ -236,7 +229,7 @@ export const OnboardingModal = ({ open, onComplete }: OnboardingModalProps) => {
                 </div>
                 <div>
                   <Label>WhatsApp *</Label>
-                  <Input value={custPhone} onChange={(e) => setCustPhone(formatPhoneBR(e.target.value))} placeholder="55 (15) 99999-9999" />
+                  <Input value={custPhone} onChange={(e) => setCustPhone(formatPhoneInput(e.target.value))} placeholder="(15) 99999-9999" />
                 </div>
                 <div>
                   <Label>Placa *</Label>
