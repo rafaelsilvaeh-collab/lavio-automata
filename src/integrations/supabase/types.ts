@@ -16,12 +16,16 @@ export type Database = {
     Tables: {
       cars_in_yard: {
         Row: {
+          ad_hoc_service_name: string | null
           created_at: string
           customer_id: string
+          entry_notes: string | null
           entry_time: string
           estimated_duration: number | null
+          final_price: number | null
           id: string
           notes: string | null
+          photo_url: string | null
           scheduled_notification_time: string | null
           service_id: string | null
           status: Database["public"]["Enums"]["car_status"]
@@ -29,12 +33,16 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ad_hoc_service_name?: string | null
           created_at?: string
           customer_id: string
+          entry_notes?: string | null
           entry_time?: string
           estimated_duration?: number | null
+          final_price?: number | null
           id?: string
           notes?: string | null
+          photo_url?: string | null
           scheduled_notification_time?: string | null
           service_id?: string | null
           status?: Database["public"]["Enums"]["car_status"]
@@ -42,12 +50,16 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ad_hoc_service_name?: string | null
           created_at?: string
           customer_id?: string
+          entry_notes?: string | null
           entry_time?: string
           estimated_duration?: number | null
+          final_price?: number | null
           id?: string
           notes?: string | null
+          photo_url?: string | null
           scheduled_notification_time?: string | null
           service_id?: string | null
           status?: Database["public"]["Enums"]["car_status"]
@@ -79,6 +91,7 @@ export type Database = {
           description: string | null
           entry_date: string
           id: string
+          is_test: boolean
           type: Database["public"]["Enums"]["cash_flow_type"]
           user_id: string
         }
@@ -89,6 +102,7 @@ export type Database = {
           description?: string | null
           entry_date?: string
           id?: string
+          is_test?: boolean
           type: Database["public"]["Enums"]["cash_flow_type"]
           user_id: string
         }
@@ -99,6 +113,7 @@ export type Database = {
           description?: string | null
           entry_date?: string
           id?: string
+          is_test?: boolean
           type?: Database["public"]["Enums"]["cash_flow_type"]
           user_id?: string
         }
