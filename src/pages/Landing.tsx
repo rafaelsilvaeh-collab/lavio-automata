@@ -159,7 +159,7 @@ const Landing = () => {
             <Card className="border-border/50 overflow-hidden shadow-lg">
               <div className="aspect-video">
                 <iframe
-                  src="https://www.youtube.com/embed/hSEnMfKVBF8"
+                  src="https://www.youtube.com/embed/LCB0Maw0LH4"
                   title="Lavgo Demo"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
