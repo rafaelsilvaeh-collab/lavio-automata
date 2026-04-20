@@ -307,7 +307,13 @@ export const RegisterCarDialog = ({ open, onOpenChange, onSuccess, editId }: Reg
       photoPath = path;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    let scheduled: string | null = null;
+    if (notifyTime) {
+      const [hh, mm] = notifyTime.split(":").map(Number);
+      const d = new Date();
+      d.setHours(hh, mm, 0, 0);
+      scheduled = d.toISOString();
+    }
     const payload = {
       user_id: user.id,
       customer_id: selectedCustomer.id,
@@ -315,7 +321,7 @@ export const RegisterCarDialog = ({ open, onOpenChange, onSuccess, editId }: Reg
       ad_hoc_service_name: serviceIdToUse ? null : serviceNameToUse,
       final_price: priceToUse,
       estimated_duration: parseInt(estimatedMinutes) || null,
-      scheduled_notification_time: notifyTime ? `${today}T${notifyTime}:00` : null,
+      scheduled_notification_time: scheduled,
       photo_url: photoPath,
       entry_notes: entryNotes.trim() || null,
     };
