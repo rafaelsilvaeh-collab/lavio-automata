@@ -84,6 +84,32 @@ serve(async (req) => {
       });
     }
 
+    if (action === "extend-trial") {
+      const days = Number(body.days);
+      if (!Number.isFinite(days) || days < 1 || days > 365) {
+        throw new Error("days deve estar entre 1 e 365");
+      }
+      const { data: current, error: selErr } = await admin
+        .from("profiles")
+        .select("trial_ends_at")
+        .eq("user_id", target_user_id)
+        .maybeSingle();
+      if (selErr) throw selErr;
+      const nowMs = Date.now();
+      const baseMs = current?.trial_ends_at
+        ? Math.max(nowMs, new Date(current.trial_ends_at).getTime())
+        : nowMs;
+      const newEnd = new Date(baseMs + days * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await admin
+        .from("profiles")
+        .update({ trial_ends_at: newEnd, updated_at: new Date().toISOString() })
+        .eq("user_id", target_user_id);
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true, trial_ends_at: newEnd }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "impersonate") {
       const { data: target } = await admin.auth.admin.getUserById(target_user_id);
       if (!target?.user?.email) throw new Error("Usuário não encontrado");
