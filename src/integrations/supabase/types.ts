@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          id: number
+          landing_headline: string
+          landing_subheadline: string
+          landing_video_url: string
+          msg_completion_default: string
+          msg_reactivation_default: string
+          plan_annual_discount: number
+          plan_annual_price: number
+          plan_monthly_price: number
+          plan_semiannual_discount: number
+          plan_semiannual_price: number
+          trial_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          landing_headline?: string
+          landing_subheadline?: string
+          landing_video_url?: string
+          msg_completion_default?: string
+          msg_reactivation_default?: string
+          plan_annual_discount?: number
+          plan_annual_price?: number
+          plan_monthly_price?: number
+          plan_semiannual_discount?: number
+          plan_semiannual_price?: number
+          trial_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          landing_headline?: string
+          landing_subheadline?: string
+          landing_video_url?: string
+          msg_completion_default?: string
+          msg_reactivation_default?: string
+          plan_annual_discount?: number
+          plan_annual_price?: number
+          plan_monthly_price?: number
+          plan_semiannual_discount?: number
+          plan_semiannual_price?: number
+          trial_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       cars_in_yard: {
         Row: {
           ad_hoc_service_name: string | null
@@ -208,6 +259,8 @@ export type Database = {
           business_name: string | null
           created_at: string
           id: string
+          is_blocked: boolean
+          last_seen_at: string | null
           onboarding_completed: boolean
           phone: string | null
           updated_at: string
@@ -217,6 +270,8 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           id?: string
+          is_blocked?: boolean
+          last_seen_at?: string | null
           onboarding_completed?: boolean
           phone?: string | null
           updated_at?: string
@@ -226,6 +281,8 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           id?: string
+          is_blocked?: boolean
+          last_seen_at?: string | null
           onboarding_completed?: boolean
           phone?: string | null
           updated_at?: string
@@ -319,6 +376,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_users: {
+        Args: never
+        Returns: {
+          business_name: string
+          cars_count: number
+          created_at: string
+          customers_count: number
+          email: string
+          is_blocked: boolean
+          last_seen_at: string
+          last_service_at: string
+          onboarding_completed: boolean
+          phone: string
+          user_id: string
+          whatsapp_connected: boolean
+        }[]
+      }
+      admin_metrics: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
