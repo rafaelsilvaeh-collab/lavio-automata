@@ -1,143 +1,101 @@
+# Habilitar "Estender trial" + Paywall ao expirar trial
 
-# Painel Admin Lavgo (/admin)
+Duas alterações relacionadas, no fluxo de trial dos clientes do Lavgo.
 
-Reconstruir a página `/admin` (hoje placeholder com valores fixos) num painel real, acessível **somente para `rafael.silva.eh@gmail.com`**, com métricas vindas do banco, gestão de usuários, diagnóstico WhatsApp, configurações editáveis e a aba **Landing Page** já existente preservada.
+---
 
-## Decisões importantes (alinhadas ao projeto real)
+## Parte 1 — Habilitar "Estender trial" no submenu admin
 
-O brief original menciona uma tabela `usuarios` com colunas `role/status/plano/preco_plano/trial_fim`. **Esse esquema não existe no Lavgo.** O projeto já usa o padrão correto (Supabase + RLS + RBAC):
+Hoje, em `src/pages/admin/AdminUsers.tsx`, o item "Estender trial" no dropdown `···` está fixo como `disabled` dentro do grupo "Aguardando pagamentos". Como o app está em fase de testes, essa ação passa a ficar **sempre habilitada** e funcional.
 
-- Identidade: `auth.users` + `public.profiles` (1:1, com `business_name`, `phone`, `onboarding_completed`).
-- Papéis: tabela separada `public.user_roles` com enum `app_role` e função `has_role()` SECURITY DEFINER. **Não vamos adicionar `role` em `profiles`** — quebraria a arquitetura de segurança documentada.
-- Assinatura: ainda **não existe** integração Stripe ativa, nem tabela de subscriptions. Logo, MRR/ARR/Churn/LTV reais não existem como dado — exibiremos os cards zerados com badge "Aguardando Stripe", em vez de inventar números.
+### Comportamento
 
-Ações como "alterar plano", "estender trial", "cancelar conta" também dependem de subscriptions reais — implemento somente as que funcionam hoje (reset de senha, bloquear/desbloquear, ver detalhes/uso, impersonar) e marco o restante como "Disponível ao ativar pagamentos".
+Ao clicar em "Estender trial":
+1. Abre um `AlertDialog` com input numérico (default `7`, mínimo `1`, máximo `365`) e mostra a data atual de fim de trial do usuário.
+2. Confirmar chama o edge function `admin-actions` com a nova ação `extend-trial`.
+3. Toast: `"Trial estendido até DD/MM/AAAA."`
+4. A linha é atualizada localmente.
 
-## 1. Acesso e segurança
+Os outros itens ("Alterar plano", "Cancelar conta") continuam desabilitados — não foram pedidos.
 
-**Migração SQL:**
-- Garantir o admin: `INSERT INTO user_roles (user_id, role) SELECT id, 'admin' FROM auth.users WHERE email = 'rafael.silva.eh@gmail.com' ON CONFLICT DO NOTHING;`
-- `profiles`: adicionar `is_blocked boolean DEFAULT false` e `last_seen_at timestamptz`.
-- Nova policy SELECT em `profiles`, `customers`, `cars_in_yard`, `cash_flow_entries`, `services`, `whatsapp_config`, `message_templates`: permitida quando `has_role(auth.uid(),'admin')`. Sem isso o admin não lê dados de outros usuários.
-- Função SECURITY DEFINER `admin_list_users()` que retorna `id, email, business_name, phone, created_at, last_seen_at, onboarding_completed, is_blocked, customers_count, cars_count, last_service_at, whatsapp_connected` (evita N+1).
-- Função SECURITY DEFINER `admin_metrics()` com agregados globais.
+---
 
-**Frontend:**
-- Hook `useIsAdmin()` consulta `user_roles`.
-- Em `/admin`: spinner enquanto carrega; se não-admin, `<Navigate to="/" replace />` sem flash de conteúdo.
+## Parte 2 — Paywall automático quando o trial expira
 
-## 2. Layout
+Quando o `trial_ends_at` do usuário (não-admin) passa de hoje **e** ele não tem assinatura ativa, ele é bloqueado por um popup global pedindo para assinar um dos planos.
 
-`/admin` continua usando `AppLayout` (sidebar global do app). Sub-navegação em **Tabs** com 5 seções: **Visão Geral · Usuários · WhatsApp · Configurações · Landing Page**. Header da página mostra "Painel Admin" + email do admin logado.
+### Onde guardar o estado do trial
 
-## 3. Visão Geral
+A tabela `profiles` ainda não tem coluna de trial. Será adicionada via migration:
 
-Cards (grid responsivo):
-- Total de usuários cadastrados (`profiles`)
-- Onboarding concluído (% sobre total)
-- WhatsApp conectados (`whatsapp_config.is_connected`)
-- Carros registrados (todos, `cars_in_yard`)
-- Clientes cadastrados (todos, `customers`)
-- Notificações enviadas (30d, `notification_status='sent'`)
-- **MRR / ARR / Churn / LTV** — `R$0` com badge "Aguardando Stripe". Honesto, não inventa.
+- `profiles.trial_ends_at timestamptz` (nullable).
+- Backfill: `update profiles set trial_ends_at = created_at + (select trial_days from app_settings where id=1) * interval '1 day' where trial_ends_at is null`.
+- `handle_new_user()` passa a setar `trial_ends_at = now() + trial_days * interval '1 day'` para novos cadastros, lendo `app_settings`.
+- `admin_list_users()` passa a retornar `trial_ends_at` (UI do admin precisa exibir).
 
-Gráficos (recharts):
-- **Barras — Novos usuários por mês (últimos 12m)** baseado em `profiles.created_at`. Mês atual em laranja `#f97316`, demais em azul `#0ea5e9`.
-- **Linha — Crescimento acumulado de usuários**.
-- **Barras — Carros registrados por mês (últimos 12m)** como proxy de uso.
+Se assinaturas reais ainda não existem (sem Stripe ativo), basta verificar `trial_ends_at < now()`. Quando Stripe for ativado, o paywall passará a checar também a tabela de subscription. Para já deixar a porta pronta, será adicionada uma coluna `profiles.subscription_status text` (default `null`) que, quando `'active'`, libera o acesso mesmo após o trial. Por enquanto ninguém escreve nela — é apenas o gancho.
 
-Tabela "Saúde do produto":
-```
-Métrica                        | Valor | Saudável | Status
-Onboarding completion          | X%    | > 60%    | 🟢/🟡/🔴
-Usuários com WA conectado      | X%    | > 50%    | 🟢/🟡/🔴
-Usuários ativos últimos 7d     | X     | -        | -
-Notificações entregues (30d)   | X%    | > 90%    | 🟢/🟡/🔴
-```
+### Componente `TrialPaywallGate`
 
-## 4. Usuários
+Novo componente envolvido em `AppLayout.tsx`, logo abaixo da checagem de `is_blocked`:
 
-Tabela com todos os `profiles` via `admin_list_users()`.
+- Lê `profiles` (`trial_ends_at`, `subscription_status`) do usuário logado.
+- Lê `user_roles` para identificar admin (admin nunca vê o paywall).
+- Lê `app_settings` (preços e descontos) para popular o conteúdo do diálogo.
+- Se `subscription_status !== 'active'` **e** `trial_ends_at <= now()`:
+  - Renderiza um `Dialog` modal **não dispensável** (`onOpenChange` ignora close, sem botão X) sobre o app.
+  - Conteúdo:
+    - Título: "Seu período de testes terminou"
+    - Subtítulo: "Escolha um plano para continuar usando o Lavgo."
+    - 3 cards (Mensal, Semestral, Anual) com preços vindos de `app_settings`, badge de desconto em verde no semestral/anual.
+    - Botão "Assinar" em cada card → por enquanto exibe toast `"Pagamentos serão habilitados em breve. Fale com o suporte."` (placeholder até Stripe ser ligado). Quando Stripe entrar, o botão chamará `create-checkout` com o `price_id` correspondente.
+    - Link "Sair" no rodapé (`supabase.auth.signOut()`).
+- Se ainda dentro do trial, mostra um banner discreto no topo do app: "Seu teste termina em N dias" (apenas quando faltam ≤ 3 dias). Sem bloquear nada.
 
-Colunas: Estabelecimento · Email · Cadastro · Último acesso · Clientes · Carros · WA · Status · Ações.
-Filtros: busca por nome/email + select de status (todos / ativos / bloqueados / sem onboarding).
+### Por que isso fica seguro
 
-Menu de ações por linha (`···`):
-- **Ver detalhes** — drawer lateral com Estabelecimento, Uso do produto, WhatsApp.
-- **Enviar link de redefinição de senha** — edge function `admin-actions` action `reset-password` chama `auth.admin.generateLink({ type:'recovery' })` com service role, retorna o link e copia pro clipboard.
-- **Bloquear / Desbloquear** — toggle `profiles.is_blocked`. `AppLayout` passa a checar e expulsa usuário bloqueado.
-- **Impersonar** — confirmação dupla, gera magic link via `admin-actions` action `impersonate`, abre em nova aba.
-- **Estender trial / Alterar plano / Cancelar conta** — visíveis e desabilitados com tooltip "Disponível ao ativar pagamentos".
+- A UI bloqueia o uso, mas a segurança real continua na RLS por `user_id`. Como ainda não há subscriptions reais, não faz sentido bloquear leitura/escrita no banco — o usuário expirado simplesmente não consegue navegar.
+- Quando Stripe entrar, adicionamos uma policy/condição extra usando `subscription_status` e `trial_ends_at` se desejado.
 
-## 5. WhatsApp (diagnóstico Evolution API)
+---
 
-Edge function `admin-evolution` (verify_jwt = true, valida `has_role admin`):
-- `get-status`: `GET {EVOLUTION_API_URL}` → versão + status + host mascarado.
-- `list-instances`: `GET /instance/fetchInstances`, cruzando com `whatsapp_config.instance_id` para mostrar o estabelecimento vinculado.
-- `send-test`: pre-flight `connectionState`, envia via `POST /message/sendText/{instanceName}`, retorna **status HTTP + body cru** da Evolution.
+## Backend (Edge Function)
 
-UI:
-- Painel "Status da API" (verde/vermelho + versão + host).
-- Form de teste (instância, número, mensagem) com resposta crua em `<pre>`.
-- Tabela "Instâncias ativas" com refresh manual.
+Em `supabase/functions/admin-actions/index.ts`, nova ação `extend-trial`:
 
-## 6. Configurações
+- Body: `{ action: "extend-trial", target_user_id, days }`.
+- Valida `days` 1–365.
+- Calcula: `new_end = max(now(), coalesce(trial_ends_at, now())) + days * interval '1 day'`.
+- `update profiles set trial_ends_at = new_end, updated_at = now() where user_id = target`.
+- Retorna `{ success: true, trial_ends_at }`.
 
-Nova tabela `app_settings` (singleton, `id = 1`):
-```
-plan_monthly_price numeric, plan_semiannual_price numeric, plan_semiannual_discount int,
-plan_annual_price numeric, plan_annual_discount int, trial_days int,
-msg_completion_default text, msg_reactivation_default text,
-updated_at timestamptz, updated_by uuid
-```
-RLS: SELECT público (preços precisam aparecer na landing), UPDATE somente admin.
+Verificação de admin via `user_roles` já existe e é reaproveitada.
 
-UI:
-- Form de preços + dias de trial.
-- Dois textareas com mensagens padrão (variáveis `{nome} {modelo} {placa}`).
-- **Preview ao vivo** ao lado, substituindo por `João / Gol / ABC-1234`.
-- Botão "Salvar" → upsert.
+---
 
-Os defaults aqui passam a ser usados como fallback quando o usuário não tiver template próprio em `message_templates`.
+## Arquivos tocados
 
-## 7. Landing Page (preservada do admin atual)
+- `src/pages/admin/AdminUsers.tsx` — habilitar "Estender trial", adicionar dialog com input de dias, exibir `trial_ends_at` na tabela (nova coluna "Trial até"), atualizar interface `AdminUserRow`.
+- `src/components/AppLayout.tsx` — montar `<TrialPaywallGate>` envolvendo o conteúdo autenticado.
+- `src/components/TrialPaywallGate.tsx` (novo) — lógica de leitura do trial e modal de planos.
+- `supabase/functions/admin-actions/index.ts` — ação `extend-trial`.
+- Migration:
+  - `alter table profiles add column trial_ends_at timestamptz`.
+  - `alter table profiles add column subscription_status text`.
+  - Backfill de `trial_ends_at` para usuários existentes.
+  - Atualizar `handle_new_user()` para preencher `trial_ends_at`.
+  - Atualizar `admin_list_users()` para retornar `trial_ends_at` e `subscription_status`.
 
-Mantém a aba existente com os campos: **headline**, **subheadline**, **URL do vídeo** — agora persistidos de verdade. Adiciono em `app_settings` as colunas `landing_headline text`, `landing_subheadline text`, `landing_video_url text`. A página `Landing.tsx` passa a ler esses campos via SELECT público em `app_settings` (com fallback para os textos atuais).
+Sem mudanças em RLS (a função usa service role; o paywall é de UI).
 
-UI da aba: igual à atual (modo visualizar com botão "Editar" → "Salvar"), só que o salvar agora faz upsert em `app_settings` em vez de só `toast.success`.
+---
 
-## Arquivos / mudanças
+## Verificação
 
-**Novos:**
-- `src/hooks/useIsAdmin.ts`
-- `src/pages/admin/AdminOverview.tsx`
-- `src/pages/admin/AdminUsers.tsx`
-- `src/pages/admin/AdminWhatsApp.tsx`
-- `src/pages/admin/AdminSettings.tsx`
-- `src/pages/admin/AdminLanding.tsx` (refatoração da aba existente, agora persistente)
-- `src/pages/admin/UserDetailsDrawer.tsx`
-- `supabase/functions/admin-actions/index.ts`
-- `supabase/functions/admin-evolution/index.ts`
-- Migration: `is_blocked`, `last_seen_at`, `app_settings` (com campos de landing), funções `admin_list_users()`/`admin_metrics()`, policies admin-SELECT, seed do role admin.
-
-**Editados:**
-- `src/pages/Admin.tsx` — vira shell com Tabs (5 abas) e guarda `useIsAdmin`.
-- `src/components/AppLayout.tsx` — checagem de `is_blocked` + atualização de `last_seen_at` no login.
-- `src/pages/Landing.tsx` — lê textos de `app_settings` com fallback.
-- `supabase/config.toml` — registro das duas novas functions.
-
-## O que NÃO entra agora
-- MRR/ARR/Churn/LTV reais e ações de plano → dependem de Stripe ativado.
-
-## Verificação final
-- [ ] `/admin` redireciona não-admin para `/` em < 1s, sem flash de conteúdo.
-- [ ] Apenas `rafael.silva.eh@gmail.com` consegue abrir as 5 abas.
-- [ ] Cards de uso refletem contagens reais do banco.
-- [ ] Gráfico de novos usuários por mês com mês atual em laranja.
-- [ ] Tabela de usuários filtra por status e busca.
-- [ ] Reset de senha gera link via Supabase Auth e copia pro clipboard.
-- [ ] Bloquear usuário impede login dele no app.
-- [ ] Teste de WhatsApp exibe corpo cru da resposta da Evolution.
-- [ ] Configurações salvam em `app_settings` e preview ao vivo funciona.
-- [ ] Aba Landing Page persiste headline/subheadline/vídeo e a Landing real reflete as alterações.
-- [ ] Nenhuma rota fora de `/admin` foi alterada além do hook de bloqueio em `AppLayout` e do read em `Landing.tsx`.
+- "Estender trial" sempre habilitado e funcional, com diálogo aceitando 1–365 dias.
+- Usuário com `trial_ends_at` no passado e sem `subscription_status='active'` vê o popup de planos imediatamente ao abrir o app, sem conseguir fechar a não ser saindo da conta.
+- Admin (`rafael.silva.eh@gmail.com`) nunca vê o paywall.
+- Estender o trial pelo painel remove o paywall na próxima carga do app do usuário afetado.
+- Banner de "trial termina em N dias" aparece somente quando faltam ≤ 3 dias.
+- Botões "Assinar" exibem placeholder até Stripe ser ligado — nenhuma cobrança real é feita agora.
+- Nenhuma outra rota foi alterada além de `AppLayout` (gate) e `AdminUsers` (ação).

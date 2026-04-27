@@ -263,6 +263,8 @@ export type Database = {
           last_seen_at: string | null
           onboarding_completed: boolean
           phone: string | null
+          subscription_status: string | null
+          trial_ends_at: string | null
           updated_at: string
           user_id: string
         }
@@ -274,6 +276,8 @@ export type Database = {
           last_seen_at?: string | null
           onboarding_completed?: boolean
           phone?: string | null
+          subscription_status?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -285,6 +289,8 @@ export type Database = {
           last_seen_at?: string | null
           onboarding_completed?: boolean
           phone?: string | null
+          subscription_status?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -389,6 +395,8 @@ export type Database = {
           last_service_at: string
           onboarding_completed: boolean
           phone: string
+          subscription_status: string
+          trial_ends_at: string
           user_id: string
           whatsapp_connected: boolean
         }[]
