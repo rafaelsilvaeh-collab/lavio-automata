@@ -25,6 +25,9 @@ export type Database = {
           final_price: number | null
           id: string
           notes: string | null
+          notification_error: string | null
+          notification_sent_at: string | null
+          notification_status: string
           photo_url: string | null
           scheduled_notification_time: string | null
           service_id: string | null
@@ -42,6 +45,9 @@ export type Database = {
           final_price?: number | null
           id?: string
           notes?: string | null
+          notification_error?: string | null
+          notification_sent_at?: string | null
+          notification_status?: string
           photo_url?: string | null
           scheduled_notification_time?: string | null
           service_id?: string | null
@@ -59,6 +65,9 @@ export type Database = {
           final_price?: number | null
           id?: string
           notes?: string | null
+          notification_error?: string | null
+          notification_sent_at?: string | null
+          notification_status?: string
           photo_url?: string | null
           scheduled_notification_time?: string | null
           service_id?: string | null
