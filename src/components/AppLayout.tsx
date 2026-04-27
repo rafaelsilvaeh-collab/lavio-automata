@@ -28,12 +28,23 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("onboarding_completed")
+        .select("onboarding_completed, is_blocked")
         .eq("user_id", user.id)
         .maybeSingle();
-      if (!cancelled && data && data.onboarding_completed === false) {
+      if (cancelled) return;
+      if (data?.is_blocked) {
+        await supabase.auth.signOut();
+        return;
+      }
+      if (data && data.onboarding_completed === false) {
         setShowOnboarding(true);
       }
+      // Best-effort: registrar último acesso. Não bloqueia o app se falhar.
+      supabase
+        .from("profiles")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .then(() => {});
     })();
     return () => { cancelled = true; };
   }, [user]);
