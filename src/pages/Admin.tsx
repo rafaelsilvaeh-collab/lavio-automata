@@ -1,128 +1,51 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Users, TrendingUp, DollarSign, Activity, Shield, Edit2, Save } from "lucide-react";
-import { toast } from "sonner";
+import { Shield } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useAuth } from "@/contexts/AuthContext";
+import { AdminOverview } from "./admin/AdminOverview";
+import { AdminUsers } from "./admin/AdminUsers";
+import { AdminWhatsApp } from "./admin/AdminWhatsApp";
+import { AdminSettings } from "./admin/AdminSettings";
+import { AdminLanding } from "./admin/AdminLanding";
 
 const Admin = () => {
-  const [planPrices, setPlanPrices] = useState({ monthly: 149, semiannualDiscount: 13, annualDiscount: 27 });
-  const [landingContent, setLandingContent] = useState({
-    headline: 'Seu pátio fica cheio e os clientes ficam perguntando no WhatsApp se o carro já está pronto?',
-    subheadline: 'O Lavio avisa automaticamente o cliente quando o carro fica pronto, organiza seu caixa e mantém seus clientes voltando.',
-    videoUrl: '',
-  });
-  const [editingPlan, setEditingPlan] = useState(false);
-  const [editingLanding, setEditingLanding] = useState(false);
+  const { isAdmin, loading } = useIsAdmin();
+  const { user } = useAuth();
 
-  const metrics = [
-    { label: 'MRR', value: 'R$0', icon: DollarSign, color: 'text-success' },
-    { label: 'Clientes ativos', value: '0', icon: Users, color: 'text-primary' },
-    { label: 'Churn', value: '0%', icon: Activity, color: 'text-warning' },
-    { label: 'Trials ativos', value: '0', icon: TrendingUp, color: 'text-accent' },
-  ];
+  if (loading) {
+    return <div className="text-muted-foreground">Verificando permissões…</div>;
+  }
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Shield className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">Admin</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Painel Admin</h1>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
+          </div>
+        </div>
       </div>
 
-      <Tabs defaultValue="metrics">
+      <Tabs defaultValue="overview">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="metrics">Métricas</TabsTrigger>
-          <TabsTrigger value="plans">Planos</TabsTrigger>
+          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+          <TabsTrigger value="settings">Configurações</TabsTrigger>
           <TabsTrigger value="landing">Landing Page</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="metrics" className="mt-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            {metrics.map(m => (
-              <Card key={m.label} className="border-border/50">
-                <CardContent className="p-4">
-                  <m.icon className={`h-6 w-6 ${m.color} mb-2`} />
-                  <p className="text-2xl font-bold text-foreground">{m.value}</p>
-                  <p className="text-xs text-muted-foreground">{m.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <Card>
-            <CardHeader><CardTitle className="text-lg">Receita total</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-success">R$0</p>
-              <p className="text-sm text-muted-foreground">Dados disponíveis após integração com Stripe</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="plans" className="mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Configuração de planos</CardTitle>
-                {!editingPlan ? (
-                  <Button size="sm" variant="outline" onClick={() => setEditingPlan(true)}><Edit2 className="mr-1 h-3 w-3" /> Editar</Button>
-                ) : (
-                  <Button size="sm" className="gradient-primary border-0" onClick={() => { setEditingPlan(false); toast.success('Planos atualizados!'); }}>
-                    <Save className="mr-1 h-3 w-3" /> Salvar
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Preço mensal (R$)</Label>
-                <Input type="number" value={planPrices.monthly} onChange={e => setPlanPrices(p => ({ ...p, monthly: +e.target.value }))} disabled={!editingPlan} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Desconto semestral (%)</Label>
-                  <Input type="number" value={planPrices.semiannualDiscount} onChange={e => setPlanPrices(p => ({ ...p, semiannualDiscount: +e.target.value }))} disabled={!editingPlan} />
-                </div>
-                <div>
-                  <Label>Desconto anual (%)</Label>
-                  <Input type="number" value={planPrices.annualDiscount} onChange={e => setPlanPrices(p => ({ ...p, annualDiscount: +e.target.value }))} disabled={!editingPlan} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="landing" className="mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Conteúdo da Landing Page</CardTitle>
-                {!editingLanding ? (
-                  <Button size="sm" variant="outline" onClick={() => setEditingLanding(true)}><Edit2 className="mr-1 h-3 w-3" /> Editar</Button>
-                ) : (
-                  <Button size="sm" className="gradient-primary border-0" onClick={() => { setEditingLanding(false); toast.success('Landing page atualizada!'); }}>
-                    <Save className="mr-1 h-3 w-3" /> Salvar
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Headline</Label>
-                <Textarea value={landingContent.headline} onChange={e => setLandingContent(p => ({ ...p, headline: e.target.value }))} disabled={!editingLanding} rows={2} />
-              </div>
-              <div>
-                <Label>Subtítulo</Label>
-                <Textarea value={landingContent.subheadline} onChange={e => setLandingContent(p => ({ ...p, subheadline: e.target.value }))} disabled={!editingLanding} rows={2} />
-              </div>
-              <div>
-                <Label>URL do vídeo</Label>
-                <Input value={landingContent.videoUrl} onChange={e => setLandingContent(p => ({ ...p, videoUrl: e.target.value }))} disabled={!editingLanding} placeholder="https://youtube.com/..." />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <TabsContent value="overview" className="mt-4"><AdminOverview /></TabsContent>
+        <TabsContent value="users" className="mt-4"><AdminUsers /></TabsContent>
+        <TabsContent value="whatsapp" className="mt-4"><AdminWhatsApp /></TabsContent>
+        <TabsContent value="settings" className="mt-4"><AdminSettings /></TabsContent>
+        <TabsContent value="landing" className="mt-4"><AdminLanding /></TabsContent>
       </Tabs>
     </div>
   );
