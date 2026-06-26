@@ -220,8 +220,8 @@ const Landing = () => {
             ))}
           </div>
 
-          {/* 3 Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          {/* 2 Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {plans.map((plan) => {
               const isSelected = billingCycle === plan.key;
               return (
@@ -242,10 +242,13 @@ const Landing = () => {
                         )}
                       </h3>
                     </div>
-                    <div className="mb-6">
-                      <span className="text-4xl font-bold text-foreground">R${plan.price}</span>
+                    <div className="mb-2">
+                      <span className="text-4xl font-bold text-foreground">R${plan.price.toFixed(2).replace('.', ',')}</span>
                       <span className="text-muted-foreground">/mês</span>
                     </div>
+                    {plan.caption && (
+                      <p className="text-sm text-muted-foreground mb-6">{plan.caption}</p>
+                    )}
                     <ul className="text-left space-y-2 mb-6">
                       {features.map((feat, i) => (
                         <li key={i} className="flex items-center gap-2 text-sm text-foreground">
@@ -260,7 +263,7 @@ const Landing = () => {
                           ? 'gradient-primary border-0'
                           : 'bg-[hsl(var(--brand-blue-dark))] hover:bg-[hsl(var(--brand-blue-darker))] text-white border-0'
                       }`}
-                      onClick={() => window.open(plan.stripeLink, '_blank')}
+                      onClick={() => window.open(plan.link, '_blank')}
                     >
                       Começar grátis
                     </Button>
