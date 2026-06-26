@@ -21,6 +21,20 @@ const DEFAULT_READY_MESSAGE = (customerName: string, plate: string) =>
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Require shared secret so only the cron job (or operators with the secret) can trigger delivery
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const incoming =
+    req.headers.get("x-cron-secret") ??
+    (req.headers.get("authorization")?.toLowerCase().startsWith("bearer ")
+      ? req.headers.get("authorization")!.slice(7).trim()
+      : null);
+  if (!cronSecret || incoming !== cronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
