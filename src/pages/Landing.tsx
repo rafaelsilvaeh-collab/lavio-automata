@@ -12,32 +12,26 @@ const SOCIAL_PROOF = {
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'semiannual' | 'annual'>('semiannual');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
 
   const plans = [
     {
       key: 'monthly' as const,
       label: 'Mensal',
-      price: 149,
+      price: 89.90,
       discount: null,
-      stripeLink: 'https://buy.stripe.com/7sY6oHdqU7etabIdtF2Ry0c',
+      link: 'https://pay.kiwify.com.br/iyteI1H',
       popular: false,
-    },
-    {
-      key: 'semiannual' as const,
-      label: 'Semestral',
-      price: 129,
-      discount: '13% OFF',
-      stripeLink: 'https://buy.stripe.com/00w14ncmQ7etdnU2P12Ry0d',
-      popular: true,
+      caption: 'ou cerca de R$ 2,99 por dia',
     },
     {
       key: 'annual' as const,
       label: 'Anual',
-      price: 109,
-      discount: '27% OFF',
-      stripeLink: 'https://buy.stripe.com/eVqdR9dqUgP3erYaht2Ry0e',
-      popular: false,
+      price: 890.00,
+      discount: 'economize 2 meses de assinatura',
+      link: 'https://pay.kiwify.com.br/idn51Vg',
+      popular: true,
+      caption: 'R$ 74,17/mês equivalente',
     },
   ];
 
@@ -202,7 +196,7 @@ const Landing = () => {
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Plano simples, sem surpresas</h2>
           <p className="text-muted-foreground mb-4">Comece com 7 dias grátis. Cancele quando quiser.</p>
           <p className="text-sm text-[#64748b] text-center mb-6 max-w-xl mx-auto">
-            R$149/mês é menos do que o valor de 2 lavagens completas perdidas por semana por falta de comunicação.
+            R$89,90/mês é menos do que o valor de 2 lavagens completas perdidas por semana por falta de comunicação.
           </p>
 
           {/* Toggle */}
@@ -226,8 +220,8 @@ const Landing = () => {
             ))}
           </div>
 
-          {/* 3 Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          {/* 2 Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {plans.map((plan) => {
               const isSelected = billingCycle === plan.key;
               return (
@@ -248,10 +242,13 @@ const Landing = () => {
                         )}
                       </h3>
                     </div>
-                    <div className="mb-6">
-                      <span className="text-4xl font-bold text-foreground">R${plan.price}</span>
+                    <div className="mb-2">
+                      <span className="text-4xl font-bold text-foreground">R${plan.price.toFixed(2).replace('.', ',')}</span>
                       <span className="text-muted-foreground">/mês</span>
                     </div>
+                    {plan.caption && (
+                      <p className="text-sm text-muted-foreground mb-6">{plan.caption}</p>
+                    )}
                     <ul className="text-left space-y-2 mb-6">
                       {features.map((feat, i) => (
                         <li key={i} className="flex items-center gap-2 text-sm text-foreground">
@@ -266,7 +263,7 @@ const Landing = () => {
                           ? 'gradient-primary border-0'
                           : 'bg-[hsl(var(--brand-blue-dark))] hover:bg-[hsl(var(--brand-blue-darker))] text-white border-0'
                       }`}
-                      onClick={() => window.open(plan.stripeLink, '_blank')}
+                      onClick={() => window.open(plan.link, '_blank')}
                     >
                       Começar grátis
                     </Button>
