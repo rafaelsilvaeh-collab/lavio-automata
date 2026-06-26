@@ -12,32 +12,26 @@ const SOCIAL_PROOF = {
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'semiannual' | 'annual'>('semiannual');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
 
   const plans = [
     {
       key: 'monthly' as const,
       label: 'Mensal',
-      price: 149,
+      price: 89.90,
       discount: null,
-      stripeLink: 'https://buy.stripe.com/7sY6oHdqU7etabIdtF2Ry0c',
+      link: 'https://pay.kiwify.com.br/iyteI1H',
       popular: false,
-    },
-    {
-      key: 'semiannual' as const,
-      label: 'Semestral',
-      price: 129,
-      discount: '13% OFF',
-      stripeLink: 'https://buy.stripe.com/00w14ncmQ7etdnU2P12Ry0d',
-      popular: true,
+      caption: 'ou cerca de R$ 2,99 por dia',
     },
     {
       key: 'annual' as const,
       label: 'Anual',
-      price: 109,
-      discount: '27% OFF',
-      stripeLink: 'https://buy.stripe.com/eVqdR9dqUgP3erYaht2Ry0e',
-      popular: false,
+      price: 890.00,
+      discount: 'economize 2 meses de assinatura',
+      link: 'https://pay.kiwify.com.br/idn51Vg',
+      popular: true,
+      caption: 'R$ 74,17/mês equivalente',
     },
   ];
 
