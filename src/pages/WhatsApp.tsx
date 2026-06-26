@@ -167,9 +167,25 @@ const WhatsApp = () => {
         toast.info("QR Code não disponível. Tente novamente em alguns segundos.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao conectar WhatsApp");
+      toast.error(friendlyError(err, "Erro ao conectar WhatsApp"));
     }
     setLoadingQr(false);
+  };
+
+  // Reset instance (delete on Evolution, force fresh QR)
+  const [resetting, setResetting] = useState(false);
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await invokeWhatsApp("reset-instance");
+      setConnected(false);
+      setQrCodeBase64(null);
+      toast.success("Instância resetada. Gerando novo QR Code…");
+      await handleConnect();
+    } catch (err: any) {
+      toast.error(friendlyError(err, "Erro ao resetar instância"));
+    }
+    setResetting(false);
   };
 
   // Check status manually
@@ -182,7 +198,7 @@ const WhatsApp = () => {
       if (isConn) setQrCodeBase64(null);
       toast.success(isConn ? "WhatsApp conectado!" : "WhatsApp desconectado");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao verificar status");
+      toast.error(friendlyError(err, "Erro ao verificar status"));
     }
     setCheckingStatus(false);
   };
@@ -195,9 +211,10 @@ const WhatsApp = () => {
       setQrCodeBase64(null);
       toast.info("WhatsApp desconectado");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao desconectar");
+      toast.error(friendlyError(err, "Erro ao desconectar"));
     }
   };
+
 
   // Save template
   const handleSaveTemplate = async (type: string) => {
