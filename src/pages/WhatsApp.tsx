@@ -42,10 +42,49 @@ const WhatsApp = () => {
     const { data, error } = await supabase.functions.invoke("whatsapp", {
       body: { action, ...extra },
     });
-    if (error) throw new Error(error.message);
-    if (data?.error) throw new Error(data.error);
+
+    // Try to extract structured error from non-2xx response body
+    if (error) {
+      let bodyMsg: string | undefined;
+      let bodyCode: string | undefined;
+      try {
+        const ctx = (error as any)?.context;
+        const resp = ctx?.response;
+        if (resp && typeof resp.clone === "function") {
+          const parsed = await resp.clone().json();
+          bodyMsg = parsed?.error;
+          bodyCode = parsed?.code;
+          console.error("[whatsapp] edge function error body:", parsed);
+        }
+      } catch {
+        // ignore parse failures
+      }
+      const e: any = new Error(bodyMsg || error.message || "Erro na função WhatsApp");
+      if (bodyCode) e.code = bodyCode;
+      throw e;
+    }
+
+    // Edge function returned 200 but with structured error payload
+    if (data?.error) {
+      const e: any = new Error(data.error);
+      if (data.code) e.code = data.code;
+      if (data.fallback) e.fallback = true;
+      throw e;
+    }
     return data;
   };
+
+  const friendlyError = (err: any, fallback: string) => {
+    const code = err?.code;
+    if (code === "WA_NOT_CONFIGURED")
+      return "Integração WhatsApp ainda não está configurada. Avise o suporte.";
+    if (code === "WA_DISCONNECTED")
+      return "WhatsApp desconectado. Reconecte na aba Conexão.";
+    if (err?.message?.toLowerCase().includes("sessão expirada"))
+      return "Sua sessão expirou. Faça login novamente.";
+    return err?.message || fallback;
+  };
+
 
   // Check initial status
   useEffect(() => {
