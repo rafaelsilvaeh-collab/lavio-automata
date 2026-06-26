@@ -18,6 +18,12 @@ const maskNumber = (n: string) => {
   return `${n.slice(0, 4)}***${n.slice(-2)}`;
 };
 
+const jsonOk = (body: unknown) =>
+  new Response(JSON.stringify(body), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status: 200,
+  });
+
 function getEvolutionConfig() {
   const url = Deno.env.get("EVOLUTION_API_URL");
   const key = Deno.env.get("EVOLUTION_API_KEY");
@@ -49,6 +55,44 @@ async function checkInstanceState(url: string, key: string, instanceName: string
   const state = data?.instance?.state || data?.state || "close";
   logStep(`[WA] action=check-state URL=${url} STATE=${state} STATUS=${res.status}`);
   return state;
+}
+
+async function deleteEvolutionInstance(url: string, key: string, instanceName: string) {
+  try {
+    // Best-effort logout first (ignored if fails)
+    await fetch(`${url}/instance/logout/${instanceName}`, {
+      method: "DELETE",
+      headers: { apikey: key },
+    }).catch(() => null);
+
+    const res = await fetch(`${url}/instance/delete/${instanceName}`, {
+      method: "DELETE",
+      headers: { apikey: key },
+    });
+    const text = await res.text().catch(() => "");
+    logStep(`[WA] delete-instance STATUS=${res.status} BODY=${text.slice(0, 200)}`);
+    return { status: res.status, ok: res.ok || res.status === 404 };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logStep(`[WA] delete-instance EXCEPTION`, { msg });
+    return { status: 0, ok: false };
+  }
+}
+
+async function createEvolutionInstance(url: string, key: string, instanceName: string) {
+  const res = await fetch(`${url}/instance/create`, {
+    method: "POST",
+    headers: { apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      instanceName,
+      qrcode: true,
+      integration: "WHATSAPP-BAILEYS",
+    }),
+  });
+  const text = await res.text();
+  let data: any = {};
+  try { data = JSON.parse(text); } catch { /* keep text */ }
+  return { res, data, text };
 }
 
 serve(async (req) => {
@@ -94,22 +138,33 @@ serve(async (req) => {
     if (action === "create-instance") {
       const { url, key } = getEvolutionConfig();
 
-      const res = await fetch(`${url}/instance/create`, {
-        method: "POST",
-        headers: { apikey: key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          instanceName,
-          qrcode: true,
-          integration: "WHATSAPP-BAILEYS",
-        }),
-      });
+      let { res, data, text } = await createEvolutionInstance(url, key, instanceName);
+      logStep(`[WA] create-instance STATUS=${res.status} BODY=${text.slice(0, 300)}`);
 
-      const data = await res.json();
-      logStep(`[WA] action=create-instance URL=${url} STATUS=${res.status}`);
+      const bodyStr = JSON.stringify(data).toLowerCase();
+      const alreadyExists = bodyStr.includes("already");
+
+      // Auto-reset on failure (not "already exists")
+      if (!res.ok && !alreadyExists) {
+        console.error("[WHATSAPP] Instance create error, attempting auto-reset:", text.slice(0, 300));
+        const del = await deleteEvolutionInstance(url, key, instanceName);
+        if (del.ok) {
+          const retry = await createEvolutionInstance(url, key, instanceName);
+          res = retry.res;
+          data = retry.data;
+          text = retry.text;
+          logStep(`[WA] create-instance RETRY STATUS=${res.status} BODY=${text.slice(0, 300)}`);
+        }
+      }
 
       if (!res.ok && !JSON.stringify(data).toLowerCase().includes("already")) {
-        console.error("[WHATSAPP] Instance create error:", JSON.stringify(data));
-        throw new Error("Falha ao criar instância WhatsApp");
+        console.error("[WHATSAPP] Instance create failed after retry:", text.slice(0, 300));
+        return jsonOk({
+          error: `Falha ao criar instância (Evolution status ${res.status}): ${text.slice(0, 160)}`,
+          code: "WA_CREATE_FAILED",
+          fallback: true,
+          status: res.status,
+        });
       }
 
       const { data: existing } = await supabase
@@ -129,9 +184,7 @@ serve(async (req) => {
           .insert({ user_id: userId, instance_id: instanceName, is_connected: false });
       }
 
-      return new Response(JSON.stringify({ success: true, instanceName }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ success: true, instanceName });
     }
 
     if (action === "get-qrcode") {
@@ -142,12 +195,33 @@ serve(async (req) => {
         headers: { apikey: key },
       });
 
-      const data = await res.json();
-      logStep(`[WA] action=get-qrcode URL=${url} STATUS=${res.status}`);
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { /* keep text */ }
+      logStep(`[WA] action=get-qrcode STATUS=${res.status} BODY=${text.slice(0, 200)}`);
 
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (!res.ok) {
+        console.error("[WHATSAPP] get-qrcode error:", text.slice(0, 300));
+        return jsonOk({
+          error: `Falha ao gerar QR Code (Evolution status ${res.status})`,
+          code: "WA_QR_FAILED",
+          fallback: true,
+          status: res.status,
+        });
+      }
+
+      return jsonOk(data);
+    }
+
+    if (action === "reset-instance") {
+      const { url, key } = getEvolutionConfig();
+      await deleteEvolutionInstance(url, key, instanceName);
+      await supabase
+        .from("whatsapp_config")
+        .update({ is_connected: false, updated_at: new Date().toISOString() })
+        .eq("user_id", userId);
+      logStep(`[WA] action=reset-instance OK instance=${instanceName}`);
+      return jsonOk({ success: true, instanceName });
     }
 
     if (action === "check-status") {
@@ -163,10 +237,7 @@ serve(async (req) => {
         })
         .eq("user_id", userId);
 
-      return new Response(
-        JSON.stringify({ conectado: isConnected, estado: state }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonOk({ conectado: isConnected, estado: state });
     }
 
     if (action === "send-message") {
@@ -210,9 +281,7 @@ serve(async (req) => {
         );
       }
 
-      return new Response(JSON.stringify({ success: true, ...data }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ success: true, ...data });
     }
 
     if (action === "disconnect") {
@@ -223,7 +292,7 @@ serve(async (req) => {
         headers: { apikey: key },
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       await supabase
         .from("whatsapp_config")
@@ -231,9 +300,7 @@ serve(async (req) => {
         .eq("user_id", userId);
 
       logStep(`[WA] action=disconnect URL=${url} STATUS=${res.status}`);
-      return new Response(JSON.stringify({ success: true, ...data }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ success: true, ...data });
     }
 
     throw new Error(`Ação desconhecida: ${action}`);
