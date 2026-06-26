@@ -19,7 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { MoreVertical, Search, KeyRound, Lock, Unlock, UserCog, Eye, CalendarClock } from "lucide-react";
+import { MoreVertical, Search, KeyRound, Lock, Unlock, UserCog, Eye, CalendarClock, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UserDetailsDrawer } from "./UserDetailsDrawer";
