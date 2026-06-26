@@ -1,101 +1,44 @@
-# Habilitar "Estender trial" + Paywall ao expirar trial
+# Corrigir conexão WhatsApp: causa real + reset de instância
 
-Duas alterações relacionadas, no fluxo de trial dos clientes do Lavgo.
+## Diagnóstico
 
----
+O toast `"Edge Function returned a non-2xx status code"` que a Fernanda viu é genérico do cliente Supabase. O frontend (`src/pages/WhatsApp.tsx → invokeWhatsApp`) descarta o corpo da resposta sempre que vem `error`, então a mensagem real produzida pela edge function (`{ error, code, ... }`) nunca chega à tela.
 
-## Parte 1 — Habilitar "Estender trial" no submenu admin
+Sem os logs da tentativa dela (não há invocações recentes da função `whatsapp` registradas), o motivo exato é desconhecido. A causa mais comum desse sintoma é **instância órfã/travada na Evolution API** — quando uma instância foi criada antes mas ficou em estado inconsistente, novas tentativas de `create-instance` ou `get-qrcode` falham silenciosamente.
 
-Hoje, em `src/pages/admin/AdminUsers.tsx`, o item "Estender trial" no dropdown `···` está fixo como `disabled` dentro do grupo "Aguardando pagamentos". Como o app está em fase de testes, essa ação passa a ficar **sempre habilitada** e funcional.
+## Mudanças
 
-### Comportamento
+### 1. `src/pages/WhatsApp.tsx` — expor o erro real
 
-Ao clicar em "Estender trial":
-1. Abre um `AlertDialog` com input numérico (default `7`, mínimo `1`, máximo `365`) e mostra a data atual de fim de trial do usuário.
-2. Confirmar chama o edge function `admin-actions` com a nova ação `extend-trial`.
-3. Toast: `"Trial estendido até DD/MM/AAAA."`
-4. A linha é atualizada localmente.
+Reescrever `invokeWhatsApp` para, quando `error` for um `FunctionsHttpError`, ler o corpo via `await error.context.response.clone().json()` e usar `body.error` na mensagem lançada (anexar `code` e `state` ao Error). Logar o objeto completo no console para suporte.
 
-Os outros itens ("Alterar plano", "Cancelar conta") continuam desabilitados — não foram pedidos.
+Em `handleConnect` / `handleCheckStatus`, mapear códigos conhecidos para textos amigáveis em português (`WA_NOT_CONFIGURED`, `WA_DISCONNECTED`, `401`, etc.); demais casos exibem `error.message` real.
 
----
+### 2. `supabase/functions/whatsapp/index.ts` — nova ação `reset-instance` + fallback automático
 
-## Parte 2 — Paywall automático quando o trial expira
+**Nova action `reset-instance`:** chama `DELETE /instance/delete/{instance}` na Evolution API, ignora 404, apaga o registro em `whatsapp_config` do usuário autenticado e retorna `{ ok: true }`. Protegida por RLS via `auth.uid()` (cada usuário só reseta a própria instância).
 
-Quando o `trial_ends_at` do usuário (não-admin) passa de hoje **e** ele não tem assinatura ativa, ele é bloqueado por um popup global pedindo para assinar um dos planos.
+**Auto-reset no `create-instance`:** quando a Evolution responde não-OK e o corpo **não** contém "already" (situação atual que gera erro genérico), antes de desistir, tentar uma vez: `DELETE` da instância + recriar. Se a recriação funcionar, segue normal; se falhar de novo, retorna erro estruturado com `status` da Evolution e trecho do body (`{ error: "Falha ao criar instância (Evolution status N): <trecho>", code: "WA_CREATE_FAILED" }`, HTTP 200 com `fallback: true` para o cliente poder reagir sem crash).
 
-### Onde guardar o estado do trial
+**Padronização de erros:** todas as respostas de erro passam a usar HTTP 200 com `{ error, code, fallback }` quando o erro vier do provedor externo (Evolution 4xx/5xx), preservando 401 só para auth de fato. Isso garante que `supabase.functions.invoke()` entregue `data` populado em vez de só um `FunctionsHttpError` opaco — combinando com a melhoria do item 1, o usuário sempre vê a causa.
 
-A tabela `profiles` ainda não tem coluna de trial. Será adicionada via migration:
+Logs adicionais (`console.error` com `status` + 300 chars do body) em `create-instance` e `get-qrcode` para diagnosticar via edge function logs caso volte a falhar.
 
-- `profiles.trial_ends_at timestamptz` (nullable).
-- Backfill: `update profiles set trial_ends_at = created_at + (select trial_days from app_settings where id=1) * interval '1 day' where trial_ends_at is null`.
-- `handle_new_user()` passa a setar `trial_ends_at = now() + trial_days * interval '1 day'` para novos cadastros, lendo `app_settings`.
-- `admin_list_users()` passa a retornar `trial_ends_at` (UI do admin precisa exibir).
+### 3. `src/pages/WhatsApp.tsx` — botão "Resetar conexão"
 
-Se assinaturas reais ainda não existem (sem Stripe ativo), basta verificar `trial_ends_at < now()`. Quando Stripe for ativado, o paywall passará a checar também a tabela de subscription. Para já deixar a porta pronta, será adicionada uma coluna `profiles.subscription_status text` (default `null`) que, quando `'active'`, libera o acesso mesmo após o trial. Por enquanto ninguém escreve nela — é apenas o gancho.
+Botão secundário visível quando há instância configurada mas desconectada (ou após erro de conexão). Chama `invokeWhatsApp("reset-instance")`, mostra toast de sucesso e dispara `handleConnect()` automaticamente para gerar QR novo. Sem confirmação extra — a ação é segura (a usuária só pode resetar a própria instância e o efeito é apenas obrigar um novo QR).
 
-### Componente `TrialPaywallGate`
+### 4. `src/pages/admin/AdminWhatsApp.tsx` — reset por usuário (admin)
 
-Novo componente envolvido em `AppLayout.tsx`, logo abaixo da checagem de `is_blocked`:
-
-- Lê `profiles` (`trial_ends_at`, `subscription_status`) do usuário logado.
-- Lê `user_roles` para identificar admin (admin nunca vê o paywall).
-- Lê `app_settings` (preços e descontos) para popular o conteúdo do diálogo.
-- Se `subscription_status !== 'active'` **e** `trial_ends_at <= now()`:
-  - Renderiza um `Dialog` modal **não dispensável** (`onOpenChange` ignora close, sem botão X) sobre o app.
-  - Conteúdo:
-    - Título: "Seu período de testes terminou"
-    - Subtítulo: "Escolha um plano para continuar usando o Lavgo."
-    - 3 cards (Mensal, Semestral, Anual) com preços vindos de `app_settings`, badge de desconto em verde no semestral/anual.
-    - Botão "Assinar" em cada card → por enquanto exibe toast `"Pagamentos serão habilitados em breve. Fale com o suporte."` (placeholder até Stripe ser ligado). Quando Stripe entrar, o botão chamará `create-checkout` com o `price_id` correspondente.
-    - Link "Sair" no rodapé (`supabase.auth.signOut()`).
-- Se ainda dentro do trial, mostra um banner discreto no topo do app: "Seu teste termina em N dias" (apenas quando faltam ≤ 3 dias). Sem bloquear nada.
-
-### Por que isso fica seguro
-
-- A UI bloqueia o uso, mas a segurança real continua na RLS por `user_id`. Como ainda não há subscriptions reais, não faz sentido bloquear leitura/escrita no banco — o usuário expirado simplesmente não consegue navegar.
-- Quando Stripe entrar, adicionamos uma policy/condição extra usando `subscription_status` e `trial_ends_at` se desejado.
-
----
-
-## Backend (Edge Function)
-
-Em `supabase/functions/admin-actions/index.ts`, nova ação `extend-trial`:
-
-- Body: `{ action: "extend-trial", target_user_id, days }`.
-- Valida `days` 1–365.
-- Calcula: `new_end = max(now(), coalesce(trial_ends_at, now())) + days * interval '1 day'`.
-- `update profiles set trial_ends_at = new_end, updated_at = now() where user_id = target`.
-- Retorna `{ success: true, trial_ends_at }`.
-
-Verificação de admin via `user_roles` já existe e é reaproveitada.
-
----
-
-## Arquivos tocados
-
-- `src/pages/admin/AdminUsers.tsx` — habilitar "Estender trial", adicionar dialog com input de dias, exibir `trial_ends_at` na tabela (nova coluna "Trial até"), atualizar interface `AdminUserRow`.
-- `src/components/AppLayout.tsx` — montar `<TrialPaywallGate>` envolvendo o conteúdo autenticado.
-- `src/components/TrialPaywallGate.tsx` (novo) — lógica de leitura do trial e modal de planos.
-- `supabase/functions/admin-actions/index.ts` — ação `extend-trial`.
-- Migration:
-  - `alter table profiles add column trial_ends_at timestamptz`.
-  - `alter table profiles add column subscription_status text`.
-  - Backfill de `trial_ends_at` para usuários existentes.
-  - Atualizar `handle_new_user()` para preencher `trial_ends_at`.
-  - Atualizar `admin_list_users()` para retornar `trial_ends_at` e `subscription_status`.
-
-Sem mudanças em RLS (a função usa service role; o paywall é de UI).
-
----
+Na seção de diagnóstico WhatsApp do painel admin, adicionar ação "Resetar instância" ao lado de cada usuário listado. Usa a edge function `admin-actions` (já existente) com nova ação `reset-whatsapp-instance`, que chama o mesmo fluxo de `DELETE` na Evolution + limpeza do `whatsapp_config` do usuário-alvo. Protegida por `has_role(auth.uid(),'admin')`. Permite resolver o caso da Fernanda **agora**, sem esperar ela tentar de novo.
 
 ## Verificação
 
-- "Estender trial" sempre habilitado e funcional, com diálogo aceitando 1–365 dias.
-- Usuário com `trial_ends_at` no passado e sem `subscription_status='active'` vê o popup de planos imediatamente ao abrir o app, sem conseguir fechar a não ser saindo da conta.
-- Admin (`rafael.silva.eh@gmail.com`) nunca vê o paywall.
-- Estender o trial pelo painel remove o paywall na próxima carga do app do usuário afetado.
-- Banner de "trial termina em N dias" aparece somente quando faltam ≤ 3 dias.
-- Botões "Assinar" exibem placeholder até Stripe ser ligado — nenhuma cobrança real é feita agora.
-- Nenhuma outra rota foi alterada além de `AppLayout` (gate) e `AdminUsers` (ação).
+- Reset manual da Fernanda via painel admin → próxima tentativa de conexão dela gera QR limpo.
+- Erros futuros aparecem no toast com causa real (ex.: "Falha ao criar instância (Evolution status 403)").
+- Caso a Evolution esteja instável, o auto-reset interno já recupera no primeiro clique do "Conectar".
+- Logs da edge function `whatsapp` passam a registrar status HTTP e trecho do body em qualquer falha.
+
+## O que NÃO muda
+
+Schema do banco, RLS, secrets, fluxo de templates, envio de mensagens, agendamento, paywall, trial. A mudança é cirúrgica na função `whatsapp`, na função `admin-actions` (nova subação), na página `WhatsApp.tsx` e na aba WhatsApp do admin.

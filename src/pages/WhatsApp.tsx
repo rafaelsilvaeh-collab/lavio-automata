@@ -42,10 +42,49 @@ const WhatsApp = () => {
     const { data, error } = await supabase.functions.invoke("whatsapp", {
       body: { action, ...extra },
     });
-    if (error) throw new Error(error.message);
-    if (data?.error) throw new Error(data.error);
+
+    // Try to extract structured error from non-2xx response body
+    if (error) {
+      let bodyMsg: string | undefined;
+      let bodyCode: string | undefined;
+      try {
+        const ctx = (error as any)?.context;
+        const resp = ctx?.response;
+        if (resp && typeof resp.clone === "function") {
+          const parsed = await resp.clone().json();
+          bodyMsg = parsed?.error;
+          bodyCode = parsed?.code;
+          console.error("[whatsapp] edge function error body:", parsed);
+        }
+      } catch {
+        // ignore parse failures
+      }
+      const e: any = new Error(bodyMsg || error.message || "Erro na função WhatsApp");
+      if (bodyCode) e.code = bodyCode;
+      throw e;
+    }
+
+    // Edge function returned 200 but with structured error payload
+    if (data?.error) {
+      const e: any = new Error(data.error);
+      if (data.code) e.code = data.code;
+      if (data.fallback) e.fallback = true;
+      throw e;
+    }
     return data;
   };
+
+  const friendlyError = (err: any, fallback: string) => {
+    const code = err?.code;
+    if (code === "WA_NOT_CONFIGURED")
+      return "Integração WhatsApp ainda não está configurada. Avise o suporte.";
+    if (code === "WA_DISCONNECTED")
+      return "WhatsApp desconectado. Reconecte na aba Conexão.";
+    if (err?.message?.toLowerCase().includes("sessão expirada"))
+      return "Sua sessão expirou. Faça login novamente.";
+    return err?.message || fallback;
+  };
+
 
   // Check initial status
   useEffect(() => {
@@ -128,9 +167,25 @@ const WhatsApp = () => {
         toast.info("QR Code não disponível. Tente novamente em alguns segundos.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao conectar WhatsApp");
+      toast.error(friendlyError(err, "Erro ao conectar WhatsApp"));
     }
     setLoadingQr(false);
+  };
+
+  // Reset instance (delete on Evolution, force fresh QR)
+  const [resetting, setResetting] = useState(false);
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await invokeWhatsApp("reset-instance");
+      setConnected(false);
+      setQrCodeBase64(null);
+      toast.success("Instância resetada. Gerando novo QR Code…");
+      await handleConnect();
+    } catch (err: any) {
+      toast.error(friendlyError(err, "Erro ao resetar instância"));
+    }
+    setResetting(false);
   };
 
   // Check status manually
@@ -143,7 +198,7 @@ const WhatsApp = () => {
       if (isConn) setQrCodeBase64(null);
       toast.success(isConn ? "WhatsApp conectado!" : "WhatsApp desconectado");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao verificar status");
+      toast.error(friendlyError(err, "Erro ao verificar status"));
     }
     setCheckingStatus(false);
   };
@@ -156,9 +211,10 @@ const WhatsApp = () => {
       setQrCodeBase64(null);
       toast.info("WhatsApp desconectado");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao desconectar");
+      toast.error(friendlyError(err, "Erro ao desconectar"));
     }
   };
+
 
   // Save template
   const handleSaveTemplate = async (type: string) => {
@@ -332,6 +388,19 @@ const WhatsApp = () => {
                         <RefreshCw className="mr-2 h-4 w-4" />
                       )}
                       Verificar status
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleReset}
+                      disabled={resetting || loadingQr}
+                      title="Apaga a instância no provedor e gera um novo QR Code"
+                    >
+                      {resetting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Power className="mr-2 h-4 w-4" />
+                      )}
+                      Resetar conexão
                     </Button>
                   </div>
                   {qrCodeBase64 && (

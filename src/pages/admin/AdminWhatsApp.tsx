@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Send } from "lucide-react";
+import { RefreshCw, Send, Power, Loader2 } from "lucide-react";
 
 interface InstanceRow {
   instance_name: string;
@@ -24,6 +24,26 @@ export function AdminWhatsApp() {
   const [form, setForm] = useState({ instanceName: "", phone: "", message: "Teste do painel admin" });
   const [response, setResponse] = useState<string>("");
   const [sending, setSending] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+
+  const handleResetInstance = async (userId: string | null, instanceName: string) => {
+    if (!userId) {
+      toast.error("Instância sem usuário vinculado — não é possível resetar via admin");
+      return;
+    }
+    if (!confirm(`Resetar a instância ${instanceName}? O usuário precisará escanear um novo QR Code.`)) return;
+    setResettingUserId(userId);
+    const { data, error } = await supabase.functions.invoke("admin-actions", {
+      body: { action: "reset-whatsapp-instance", target_user_id: userId },
+    });
+    setResettingUserId(null);
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Falha ao resetar instância");
+      return;
+    }
+    toast.success(`Instância ${instanceName} resetada (status ${data?.evolution_status})`);
+    loadAll();
+  };
 
   const loadAll = async () => {
     setLoading(true);
@@ -116,11 +136,12 @@ export function AdminWhatsApp() {
                 <TableHead>Instância</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Estabelecimento vinculado</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {instances.length === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhuma instância encontrada</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhuma instância encontrada</TableCell></TableRow>
               )}
               {instances.map((i) => (
                 <TableRow key={i.instance_name || Math.random()}>
@@ -131,6 +152,21 @@ export function AdminWhatsApp() {
                     </Badge>
                   </TableCell>
                   <TableCell>{i.owner_business_name || <span className="text-muted-foreground">(não vinculado)</span>}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!i.owner_user_id || resettingUserId === i.owner_user_id}
+                      onClick={() => handleResetInstance(i.owner_user_id, i.instance_name)}
+                    >
+                      {resettingUserId === i.owner_user_id ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Power className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      Resetar
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
