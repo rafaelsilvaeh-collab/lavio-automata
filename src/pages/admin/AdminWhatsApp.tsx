@@ -24,6 +24,26 @@ export function AdminWhatsApp() {
   const [form, setForm] = useState({ instanceName: "", phone: "", message: "Teste do painel admin" });
   const [response, setResponse] = useState<string>("");
   const [sending, setSending] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+
+  const handleResetInstance = async (userId: string | null, instanceName: string) => {
+    if (!userId) {
+      toast.error("Instância sem usuário vinculado — não é possível resetar via admin");
+      return;
+    }
+    if (!confirm(`Resetar a instância ${instanceName}? O usuário precisará escanear um novo QR Code.`)) return;
+    setResettingUserId(userId);
+    const { data, error } = await supabase.functions.invoke("admin-actions", {
+      body: { action: "reset-whatsapp-instance", target_user_id: userId },
+    });
+    setResettingUserId(null);
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Falha ao resetar instância");
+      return;
+    }
+    toast.success(`Instância ${instanceName} resetada (status ${data?.evolution_status})`);
+    loadAll();
+  };
 
   const loadAll = async () => {
     setLoading(true);
