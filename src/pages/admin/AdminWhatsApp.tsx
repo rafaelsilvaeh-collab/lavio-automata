@@ -136,11 +136,12 @@ export function AdminWhatsApp() {
                 <TableHead>Instância</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Estabelecimento vinculado</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {instances.length === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhuma instância encontrada</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhuma instância encontrada</TableCell></TableRow>
               )}
               {instances.map((i) => (
                 <TableRow key={i.instance_name || Math.random()}>
@@ -151,6 +152,21 @@ export function AdminWhatsApp() {
                     </Badge>
                   </TableCell>
                   <TableCell>{i.owner_business_name || <span className="text-muted-foreground">(não vinculado)</span>}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!i.owner_user_id || resettingUserId === i.owner_user_id}
+                      onClick={() => handleResetInstance(i.owner_user_id, i.instance_name)}
+                    >
+                      {resettingUserId === i.owner_user_id ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Power className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      Resetar
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
