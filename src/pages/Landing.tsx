@@ -196,7 +196,7 @@ const Landing = () => {
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">Plano simples, sem surpresas</h2>
           <p className="text-muted-foreground mb-4">Comece com 7 dias grátis. Cancele quando quiser.</p>
           <p className="text-sm text-[#64748b] text-center mb-6 max-w-xl mx-auto">
-            R$149/mês é menos do que o valor de 2 lavagens completas perdidas por semana por falta de comunicação.
+            R$89,90/mês é menos do que o valor de 2 lavagens completas perdidas por semana por falta de comunicação.
           </p>
 
           {/* Toggle */}
