@@ -389,6 +389,19 @@ const WhatsApp = () => {
                       )}
                       Verificar status
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleReset}
+                      disabled={resetting || loadingQr}
+                      title="Apaga a instância no provedor e gera um novo QR Code"
+                    >
+                      {resetting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Power className="mr-2 h-4 w-4" />
+                      )}
+                      Resetar conexão
+                    </Button>
                   </div>
                   {qrCodeBase64 && (
                     <p className="text-xs text-muted-foreground mt-3">
