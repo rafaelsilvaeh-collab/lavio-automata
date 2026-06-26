@@ -19,7 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { MoreVertical, Search, KeyRound, Lock, Unlock, UserCog, Eye, CalendarClock } from "lucide-react";
+import { MoreVertical, Search, KeyRound, Lock, Unlock, UserCog, Eye, CalendarClock, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UserDetailsDrawer } from "./UserDetailsDrawer";
@@ -115,6 +115,20 @@ export function AdminUsers() {
       window.open(data.link, "_blank", "noopener,noreferrer");
       toast.success("Sessão de impersonação aberta em nova aba");
     }
+  };
+
+  const handleResetWhatsApp = async (u: AdminUserRow) => {
+    const { data, error } = await supabase.functions.invoke("admin-actions", {
+      body: { action: "reset-whatsapp-instance", target_user_id: u.user_id },
+    });
+    if (error || data?.error) {
+      toast.error(error?.message || data?.error || "Falha ao resetar WhatsApp");
+      return;
+    }
+    toast.success("Conexão WhatsApp resetada", {
+      description: data?.instance_name ? `Instância ${data.instance_name}` : undefined,
+    });
+    load();
   };
 
   const openTrialDialog = (u: AdminUserRow) => {
@@ -256,6 +270,27 @@ export function AdminUsers() {
                         <DropdownMenuItem onClick={() => openTrialDialog(u)}>
                           <CalendarClock className="mr-2 h-4 w-4" /> Estender trial
                         </DropdownMenuItem>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <MessageSquare className="mr-2 h-4 w-4" /> Resetar WhatsApp
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Resetar conexão do WhatsApp?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Isso apaga a instância atual de <strong>{u.email}</strong> na Evolution API. O usuário precisará escanear um novo QR code para reconectar. Use para suporte quando a conexão estiver travada.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleResetWhatsApp(u)}>Resetar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
