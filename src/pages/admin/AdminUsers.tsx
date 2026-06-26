@@ -117,6 +117,20 @@ export function AdminUsers() {
     }
   };
 
+  const handleResetWhatsApp = async (u: AdminUserRow) => {
+    const { data, error } = await supabase.functions.invoke("admin-actions", {
+      body: { action: "reset-whatsapp-instance", target_user_id: u.user_id },
+    });
+    if (error || data?.error) {
+      toast.error(error?.message || data?.error || "Falha ao resetar WhatsApp");
+      return;
+    }
+    toast.success("Conexão WhatsApp resetada", {
+      description: data?.instance_name ? `Instância ${data.instance_name}` : undefined,
+    });
+    load();
+  };
+
   const openTrialDialog = (u: AdminUserRow) => {
     setTrialUser(u);
     setTrialDays(7);
