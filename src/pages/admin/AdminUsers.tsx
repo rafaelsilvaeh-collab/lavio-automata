@@ -274,6 +274,27 @@ export function AdminUsers() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <MessageSquare className="mr-2 h-4 w-4" /> Resetar WhatsApp
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Resetar conexão do WhatsApp?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Isso apaga a instância atual de <strong>{u.email}</strong> na Evolution API. O usuário precisará escanear um novo QR code para reconectar. Use para suporte quando a conexão estiver travada.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleResetWhatsApp(u)}>Resetar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                               <UserCog className="mr-2 h-4 w-4" /> Impersonar
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
