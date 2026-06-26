@@ -124,6 +124,50 @@ serve(async (req) => {
       });
     }
 
+    if (action === "reset-whatsapp-instance") {
+      if (!target_user_id) throw new Error("target_user_id obrigatório");
+      const evoUrl = (Deno.env.get("EVOLUTION_API_URL") || "").replace(/\/$/, "");
+      const evoKey = Deno.env.get("EVOLUTION_API_KEY") || "";
+      if (!evoUrl || !evoKey) throw new Error("Evolution API não configurada");
+
+      // Resolve instance: prefer stored, fall back to deterministic name
+      const { data: cfg } = await admin
+        .from("whatsapp_config")
+        .select("instance_id")
+        .eq("user_id", target_user_id)
+        .maybeSingle();
+      const instanceName =
+        cfg?.instance_id ||
+        `lavgo_${String(target_user_id).replace(/-/g, "").slice(0, 16)}`;
+
+      // Best-effort logout, then delete
+      await fetch(`${evoUrl}/instance/logout/${instanceName}`, {
+        method: "DELETE",
+        headers: { apikey: evoKey },
+      }).catch(() => null);
+      const delRes = await fetch(`${evoUrl}/instance/delete/${instanceName}`, {
+        method: "DELETE",
+        headers: { apikey: evoKey },
+      });
+      const delText = await delRes.text().catch(() => "");
+      log("reset-whatsapp-instance", { target_user_id, instanceName, status: delRes.status });
+
+      await admin
+        .from("whatsapp_config")
+        .update({ is_connected: false, updated_at: new Date().toISOString() })
+        .eq("user_id", target_user_id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          instanceName,
+          evolution_status: delRes.status,
+          evolution_body: delText.slice(0, 200),
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     throw new Error(`Ação desconhecida: ${action}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
