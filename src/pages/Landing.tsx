@@ -28,10 +28,11 @@ const Landing = () => {
       key: 'annual' as const,
       label: 'Anual',
       price: 890.00,
+      monthlyEquivalent: 74.17,
       discount: 'economize 2 meses de assinatura',
       link: 'https://pay.kiwify.com.br/idn51Vg',
       popular: true,
-      caption: 'R$ 74,17/mês equivalente',
+      caption: 'Faturado anualmente (R$ 890,00/ano)',
     },
   ];
 
@@ -243,8 +244,17 @@ const Landing = () => {
                       </h3>
                     </div>
                     <div className="mb-2">
-                      <span className="text-4xl font-bold text-foreground">R${plan.price.toFixed(2).replace('.', ',')}</span>
-                      <span className="text-muted-foreground">/mês</span>
+                      {plan.monthlyEquivalent ? (
+                        <>
+                          <span className="text-4xl font-bold text-foreground">R${plan.monthlyEquivalent.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-muted-foreground">/mês</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-bold text-foreground">R${plan.price.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-muted-foreground">/mês</span>
+                        </>
+                      )}
                     </div>
                     {plan.caption && (
                       <p className="text-sm text-muted-foreground mb-6">{plan.caption}</p>
