@@ -28,10 +28,11 @@ const Landing = () => {
       key: 'annual' as const,
       label: 'Anual',
       price: 890.00,
+      monthlyEquivalent: 74.17,
       discount: 'economize 2 meses de assinatura',
       link: 'https://pay.kiwify.com.br/idn51Vg',
       popular: true,
-      caption: 'R$ 74,17/mês equivalente',
+      caption: 'Faturado anualmente (R$ 890,00/ano)',
     },
   ];
 
