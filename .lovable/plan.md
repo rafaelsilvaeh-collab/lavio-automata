@@ -1,23 +1,34 @@
-# Plano: correção dos findings de segurança + reset de WhatsApp no admin
+Plano revisado com priorização:
 
-## 1. Proteger a edge function `send-scheduled-notifications` (finding `unauth_scheduled_notif`)
-- O código da função já foi ajustado para exigir o cabeçalho `x-cron-secret` comparado à env `CRON_SECRET`.
-- Rotação do `CRON_SECRET`: deletar o valor atual, gerar um novo e armazená-lo via `set_secret`.
-- Atualizar o job `pg_cron` existente (`send-scheduled-notifications-every-minute`) para enviar `x-cron-secret` com o mesmo valor.
+## 1. Correção prioritária: WhatsApp — erro "Application not found" (Evolution status 404)
 
-> **Atenção:** entre a deleção e a recriação do secret pode haver até 1 execução do cron retornando 401 — sem impacto funcional (a próxima execução reprocessa as notificações pendentes).
+O usuário está vendo o erro ao tentar conectar/reconectar o WhatsApp: após resetar a instância, a função `create-instance` retorna `404 Application not found`.
 
-## 2. Validar paywall no servidor via RLS (finding `paywall_client_side`)
-- Criar função `public.is_subscription_active(uid)` retornando `true` quando `trial_ends_at > now()` ou `subscription_status = 'active'`, ou quando o usuário tem role `admin`.
-- Adicionar essa verificação como política RLS **restrictiva** nas tabelas multi-tenant: `customers`, `cars_in_yard`, `cash_flow_entries`, `services`, `message_templates`, `whatsapp_config`. Mantém as policies atuais por `auth.uid()` e soma a restrição de assinatura ativa.
-- Admins continuam com acesso por já passarem na função.
+### Arquivos afetados
+- `supabase/functions/whatsapp/index.ts` (ação `create-instance` e endpoints usados)
+- `supabase/functions/admin-actions/index.ts` (reset de instância via admin)
+- `src/pages/WhatsApp.tsx` (mensagens de erro e fluxo de reconexão, se necessário)
 
-> **Risco**: usuários com trial expirado perdem leitura/escrita de dados (comportamento desejado do paywall). A usuária beta `fernanda.andradi@gmail.com` continua liberada porque o trial dela está estendido até 2026-07-24.
+### O que será feito
+- Verificar logs da edge function `whatsapp` para confirmar a URL exata que retorna 404.
+- Validar se os endpoints do Evolution API v1.8.x estão corretos (`/instance/create`, headers `apikey`, body `integration: "WHATSAPP-BAILEYS"`).
+- Corrigir endpoint, path, headers ou payload conforme a versão real do Evolution API configurado no projeto.
+- Adicionar tratamento específico para o erro "Application not found" (mensagem amigável no frontend e/ou tentativa fallback configurável).
+- Testar o fluxo completo: reset → create-instance → get-qrcode → check-status.
+- Se necessário, alinhar `admin-actions` para usar a mesma lógica de criação/reset.
 
-## 3. Adicionar reset de WhatsApp por usuário no Admin
-- Em `src/pages/admin/AdminUsers.tsx`, no menu de ações (`···`) de cada usuário, adicionar o item **"Resetar conexão WhatsApp"**.
-- Ação chama `admin-actions` com `action: "reset-whatsapp-instance"` e `target_user_id` do usuário selecionado (a edge function já existe e trata o caso de instância inexistente na Evolution).
-- Confirmação simples antes de executar; toast com o resultado.
+## 2. Reorganizar card do plano anual na Landing page
 
-## 4. Marcar findings como corrigidos
-- Usar `manage_security_finding` para `unauth_scheduled_notif` e `paywall_client_side` após aplicar as mudanças.
+### Arquivo afetado
+- `src/pages/Landing.tsx`
+
+### O que será feito
+- No card do plano Anual, colocar **R$ 74,17 /mês** como destaque principal.
+- Abaixo do destaque, exibir o texto de apoio: **Faturado anualmente (R$ 890,00/ano)**.
+- Manter a tag de benefício: **Economize 2 meses de assinatura** (ou **Economize cerca de 17%**).
+- Deixar o plano Mensal inalterado.
+- Ajustar a hierarquia visual para reduzir a percepção de custo alto do pagamento anual.
+
+---
+
+A correção do WhatsApp será feita primeiro, pois bloqueia uma função core do app. A alteração nos preços da landing page virá em seguida.
