@@ -244,8 +244,17 @@ const Landing = () => {
                       </h3>
                     </div>
                     <div className="mb-2">
-                      <span className="text-4xl font-bold text-foreground">R${plan.price.toFixed(2).replace('.', ',')}</span>
-                      <span className="text-muted-foreground">/mês</span>
+                      {plan.monthlyEquivalent ? (
+                        <>
+                          <span className="text-4xl font-bold text-foreground">R${plan.monthlyEquivalent.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-muted-foreground">/mês</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-bold text-foreground">R${plan.price.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-muted-foreground">/mês</span>
+                        </>
+                      )}
                     </div>
                     {plan.caption && (
                       <p className="text-sm text-muted-foreground mb-6">{plan.caption}</p>
